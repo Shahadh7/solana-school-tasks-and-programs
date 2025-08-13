@@ -21,15 +21,37 @@ pub fn initialize_tweet(
     topic: String,
     content: String,
 ) -> Result<()> {
-    // TODO: Implement initialize tweet functionality
-    todo!()
+    if topic.as_bytes().len() > TOPIC_LENGTH {
+        return Err(TwitterError::TopicTooLong.into());
+    }
+
+    if content.as_bytes().len() > CONTENT_LENGTH {
+        return Err(TwitterError::ContentTooLong.into());
+    }
+
+    let tweet = &mut ctx.accounts.tweet;
+    tweet.tweet_author = ctx.accounts.tweet_authority.key();
+    tweet.topic = topic;
+    tweet.content = content;
+    tweet.likes = 0;
+    tweet.dislikes = 0;
+    tweet.bump = ctx.bumps.tweet;
+
+    Ok(())
 }
 
 #[derive(Accounts)]
 #[instruction(topic: String)]
 pub struct InitializeTweet<'info> {
-    // TODO: Add required account constraints
+    #[account(mut)]
     pub tweet_authority: Signer<'info>,
+    #[account(
+        init,
+        payer = tweet_authority,
+        space = 8 + Tweet::INIT_SPACE,
+        seeds = [topic.as_bytes(), TWEET_SEED.as_bytes(), tweet_authority.key().as_ref()],
+        bump
+    )]
     pub tweet: Account<'info, Tweet>,
     pub system_program: Program<'info, System>,
 }
