@@ -4,7 +4,7 @@ import { DearFuture } from "../target/types/dear_future";
 import { expect } from "chai";
 import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
-describe("dear_future", () => {
+describe("Dear Future: Capsules Management ", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
@@ -15,6 +15,9 @@ describe("dear_future", () => {
   let configBump: number;
   let capsulePda: PublicKey;
   let capsuleBump: number;
+
+  let unlockedCapsulePda: PublicKey;
+  let unlockedCapsuleID: number;
 
   //Test data
   const title = "My Future Capsule";
@@ -337,6 +340,8 @@ describe("dear_future", () => {
 
       const capsuleAccount = await program.account.capsule.fetch(futureCapsulePda);
       expect(capsuleAccount.isUnlocked).to.be.true;
+      unlockedCapsulePda = futureCapsulePda; // Save for later tests
+      unlockedCapsuleID = capsuleAccount.id.toNumber();
     });
 
     it("Should fail to update capsule after unlock", async () => {
@@ -351,6 +356,125 @@ describe("dear_future", () => {
         expect.fail("Should have failed");
       } catch (error) {
         expect(error.message).to.include("CapsuleAlreadyUnlocked");
+      }
+    });
+  });
+
+  describe("Capsule Closing", () => {
+    it("Should close unlocked capsule successfully", async () => {
+      const initialBalance = await provider.connection.getBalance(wallet.publicKey);
+      
+      // Get the unlocked capsule PDA that we can close
+      const configAccount = await program.account.config.fetch(configPda);
+      const capsuleId = unlockedCapsuleID; // The past capsule we created and unlocked
+      
+      const [unlockedCapsulePda] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("capsule"),
+          wallet.publicKey.toBuffer(),
+          new anchor.BN(capsuleId).toBuffer("le", 8),
+        ],
+        program.programId
+      );
+
+      await program.methods
+        .closeCapsule()
+        .accounts({
+          capsule: unlockedCapsulePda,
+          creator: wallet.publicKey,
+        })
+        .rpc();
+
+      // Verify capsule account is closed
+      try {
+        await program.account.capsule.fetch(unlockedCapsulePda);
+        expect.fail("Account should be closed");
+      } catch (error) {
+        expect(error.message).to.include("Account does not exist");
+      }
+
+      // Verify rent was reclaimed
+      const finalBalance = await provider.connection.getBalance(wallet.publicKey);
+      expect(finalBalance).to.be.greaterThan(initialBalance);
+    });
+
+    it("Should fail to close locked capsule", async () => {
+      try {
+        await program.methods
+          .closeCapsule()
+          .accounts({
+            capsule: capsulePda, // This one is still locked
+            creator: wallet.publicKey,
+          })
+          .rpc();
+        expect.fail("Should have failed");
+      } catch (error) {
+        expect(error.message).to.include("CannotCloseLockedCapsule");
+      }
+    });
+
+    it("Should fail to close from non-creator", async () => {
+      // Create and unlock another capsule first
+      const configAccount = await program.account.config.fetch(configPda);
+      const capsuleId = configAccount.totalCapsules.toNumber();
+
+      // Create a capsule with future unlock date (15 seconds from now)
+      let futureUnlockDate = Math.floor(Date.now() / 1000) + 15; // 15 seconds from now
+
+      const [newCapsulePda] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("capsule"),
+          wallet.publicKey.toBuffer(),
+          new anchor.BN(capsuleId).toBuffer("le", 8),
+        ],
+        program.programId
+      );
+
+      await program.methods
+        .createCapsule("Another Past Capsule", "For closing test", new anchor.BN(futureUnlockDate))
+        .accounts({
+          config: configPda,
+          capsule: newCapsulePda,
+          creator: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+      
+      // Wait for the unlock time to pass (30 seconds + small buffer)
+      const waitTime = futureUnlockDate * 1000 - Date.now() + 3000; // Add 3 second buffer
+      if (waitTime > 0) {
+        console.log(`Waiting ${waitTime}ms for capsule to be unlockable...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+
+      await program.methods
+        .unlockCapsule()
+        .accounts({
+          capsule: newCapsulePda,
+          unlocker: wallet.publicKey,
+        })
+        .rpc();
+
+      // Try to close from non-creator
+      const nonCreator = anchor.web3.Keypair.generate();
+      const airdropTx = await provider.connection.requestAirdrop(
+        nonCreator.publicKey,
+        LAMPORTS_PER_SOL
+      );
+      await provider.connection.confirmTransaction(airdropTx);
+
+      try {
+        await program.methods
+          .closeCapsule()
+          .accounts({
+            capsule: newCapsulePda,
+            creator: nonCreator.publicKey,
+          })
+          .signers([nonCreator])
+          .rpc();
+        expect.fail("Should have failed");
+      } catch (error) {
+        expect(error.message).to.include("AnchorError caused by account");
       }
     });
   });

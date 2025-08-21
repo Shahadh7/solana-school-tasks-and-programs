@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use crate::{state::{Config, Capsule}, errors::ErrorCode, events::CapsuleCreated};
+use crate::{state::*, errors::ErrorCode, events::CapsuleCreated};
 
 #[derive(Accounts)]
 pub struct CreateCapsule<'info> {
@@ -13,7 +13,7 @@ pub struct CreateCapsule<'info> {
     #[account(
         init,
         payer = creator,
-        space = Capsule::SPACE,
+        space = Capsule::INIT_SPACE,
         seeds = [Capsule::SEED, creator.key().as_ref(), &config.total_capsules.to_le_bytes()],
         bump
     )]
@@ -35,14 +35,13 @@ pub fn handler(
     let capsule = &mut ctx.accounts.capsule;
     let clock = Clock::get()?;
     
-    // Validate inputs
     require!(
-        title.len() <= Capsule::MAX_TITLE_LENGTH,
+        title.len() <= MAX_TITLE_LENGTH,
         ErrorCode::TitleTooLong
     );
     
     require!(
-        content.len() <= Capsule::MAX_CONTENT_LENGTH,
+        content.len() <= MAX_CONTENT_LENGTH,
         ErrorCode::ContentTooLong
     );
     
@@ -51,7 +50,6 @@ pub fn handler(
         ErrorCode::UnlockDateMustBeFuture
     );
     
-    // Initialize capsule
     capsule.creator = ctx.accounts.creator.key();
     capsule.id = config.total_capsules;
     capsule.title = title.clone();
@@ -66,7 +64,6 @@ pub fn handler(
     // Update global counter
     config.total_capsules = config.total_capsules.checked_add(1).unwrap();
     
-    // Emit event
     emit!(CapsuleCreated {
         capsule: capsule.key(),
         creator: ctx.accounts.creator.key(),

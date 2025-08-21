@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use crate::{state::Capsule, errors::ErrorCode, events::CapsuleUpdated};
+use crate::{state::*, errors::ErrorCode, events::CapsuleUpdated};
 
 #[derive(Accounts)]
 pub struct UpdateCapsule<'info> {
@@ -29,7 +29,7 @@ pub fn handler(
     
     if let Some(content) = new_content {
         require!(
-            content.len() <= Capsule::MAX_CONTENT_LENGTH,
+            content.len() <= MAX_CONTENT_LENGTH,
             ErrorCode::ContentTooLong
         );
         capsule.content = content;

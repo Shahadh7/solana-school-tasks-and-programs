@@ -6,7 +6,7 @@ pub struct InitializeConfig<'info> {
     #[account(
         init,
         payer = authority,
-        space = Config::SPACE,
+        space = 8 + Config::INIT_SPACE,
         seeds = [Config::SEED],
         bump
     )]

@@ -33,27 +33,11 @@ pub struct CapsuleClosed {
 }
 
 #[event]
-pub struct CapsulePnftMinted {
+pub struct CapsuleNftMinted {
     pub capsule: Pubkey,
     pub mint: Pubkey,
     pub creator: Pubkey,
     pub name: String,
     pub symbol: String,
-    pub timestamp: i64,
-}
-
-#[event]
-pub struct CapsulePnftLocked {
-    pub capsule: Pubkey,
-    pub mint: Pubkey,
-    pub locker: Pubkey,
-    pub timestamp: i64,
-}
-
-#[event]
-pub struct CapsulePnftUnlocked {
-    pub capsule: Pubkey,
-    pub mint: Pubkey,
-    pub unlocker: Pubkey,
     pub timestamp: i64,
 }

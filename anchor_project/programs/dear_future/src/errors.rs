@@ -26,14 +26,8 @@ pub enum ErrorCode {
     #[msg("Capsule already has a mint associated with it")]
     CapsuleAlreadyHasMint,
 
-    #[msg("Capsule must have a mint before locking/unlocking pNFT")]
-    CapsuleMustHaveMint,
-
     #[msg("Invalid token account for this capsule")]
     InvalidTokenAccount,
-
-    #[msg("Token is not a Programmable NFT")]
-    NotProgrammableNft,
 
     #[msg("Only the capsule creator can perform this action")]
     UnauthorizedAccess,

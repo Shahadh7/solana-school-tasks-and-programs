@@ -1,0 +1,446 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700;800&display=swap');
+
+@import "tailwindcss";
+
+/* Crypto Modern Design System */
+:root {
+  /* Golden Color Palette - Matching Logo */
+  --crypto-primary: #D4AC54;
+  --crypto-secondary: #EBC57B;
+  --crypto-accent: #E0B866;
+  --crypto-success: #B8A152;
+  --crypto-warning: #DFB760;
+  --crypto-error: #DC8850;
+  
+  /* Modern Golden Gradients */
+  --gradient-primary: linear-gradient(135deg, #D4AC54 0%, #B8A152 100%);
+  --gradient-crypto: linear-gradient(135deg, #EBC57B 0%, #D4AC54 50%, #E0B866 100%);
+  --gradient-dark: linear-gradient(135deg, #0c0c0c 0%, #1a1612 50%, #181615 100%);
+  --gradient-glass: linear-gradient(135deg, rgba(212,172,84,0.1) 0%, rgba(212,172,84,0.05) 100%);
+  
+  /* Golden Shadows */
+  --shadow-crypto: 0 8px 32px rgba(212, 172, 84, 0.3);
+  --shadow-golden: 0 8px 32px rgba(235, 197, 123, 0.3);
+  --shadow-dark: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+  --shadow-glass: 0 8px 32px rgba(212, 172, 84, 0.2);
+}
+
+/* Wallet Adapter Styles - Crypto Modern */
+.wallet-adapter-button {
+  background: var(--gradient-crypto);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  height: 44px;
+  line-height: 1;
+  padding: 0 20px;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-crypto);
+}
+
+.wallet-adapter-button:not([disabled]):hover {
+  background: var(--gradient-crypto);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: var(--shadow-crypto), 0 0 30px rgba(212, 172, 84, 0.5);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.wallet-adapter-button:not([disabled]):active {
+  transform: translateY(0) scale(0.98);
+}
+
+.wallet-adapter-button[disabled] {
+  background: linear-gradient(135deg, #374151 0%, #6b7280 100%);
+  cursor: not-allowed;
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+.wallet-adapter-button-end-icon,
+.wallet-adapter-button-start-icon {
+  display: flex;
+  align-items: center;
+  margin: 0 6px;
+}
+
+/* Custom Wallet Button Wrapper for CTA Card */
+.wallet-button-wrapper .wallet-adapter-button {
+  width: 100% !important;
+  justify-content: center !important;
+  background: linear-gradient(to right, #f59e0b, #eab308, #ea580c) !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+  font-size: 1.125rem !important;
+  padding: 1rem 2rem !important;
+  border-radius: 1rem !important;
+  border: none !important;
+  min-height: 56px !important;
+  height: auto !important;
+  box-shadow: 0 20px 25px -5px rgba(245, 158, 11, 0.3), 0 10px 10px -5px rgba(245, 158, 11, 0.2) !important;
+  transform: none !important;
+  transition: all 0.3s ease !important;
+}
+
+.wallet-button-wrapper .wallet-adapter-button:hover {
+  background: linear-gradient(to right, #d97706, #ca8a04, #c2410c) !important;
+  box-shadow: 0 20px 25px -5px rgba(245, 158, 11, 0.5), 0 10px 10px -5px rgba(245, 158, 11, 0.3) !important;
+  transform: scale(1.05) !important;
+}
+
+.wallet-button-wrapper .wallet-adapter-button:active {
+  transform: scale(0.98) !important;
+}
+
+.wallet-adapter-modal-overlay {
+  background: rgba(0, 0, 0, 0.9) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 1000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+  animation: modalOverlayFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  margin: 0 !important;
+}
+
+.wallet-adapter-modal-container {
+  background: rgba(24, 22, 21, 0.95) !important;
+  border: 1px solid rgba(212, 172, 84, 0.3) !important;
+  border-radius: 24px !important;
+  box-shadow: 
+    var(--shadow-dark),
+    0 0 40px rgba(212, 172, 84, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  max-width: 420px !important;
+  width: 100% !important;
+  max-height: 90vh !important;
+  backdrop-filter: blur(40px) !important;
+  -webkit-backdrop-filter: blur(40px) !important;
+  position: relative !important;
+  animation: modalContainerSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transform-origin: center !important;
+  margin: 0 auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+}
+
+.wallet-adapter-modal-wrapper {
+  border-radius: 24px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+  padding: 32px;
+}
+
+/* Modal Animations */
+@keyframes modalOverlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalContainerSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Modal Content Styling */
+.wallet-adapter-modal-title {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  color: white !important;
+  margin-bottom: 16px !important;
+  text-align: center !important;
+  background: var(--gradient-crypto) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+.wallet-adapter-modal-list {
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.wallet-adapter-modal-list-item {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  overflow: hidden !important;
+}
+
+.wallet-adapter-modal-list-item:hover {
+  background: rgba(212, 172, 84, 0.1) !important;
+  border-color: rgba(212, 172, 84, 0.3) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(212, 172, 84, 0.2) !important;
+}
+
+.wallet-adapter-modal-list-item button {
+  width: 100% !important;
+  padding: 20px !important;
+  background: transparent !important;
+  border: none !important;
+  color: white !important;
+  font-weight: 600 !important;
+  font-size: 16px !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+}
+
+.wallet-adapter-modal-list-item img {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+}
+
+.wallet-adapter-modal-middle {
+  text-align: center !important;
+  padding: 20px 0 !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 14px !important;
+}
+
+/* Close Button Styling */
+.wallet-adapter-modal-button-close {
+  position: absolute !important;
+  top: 16px !important;
+  right: 16px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 12px !important;
+  width: 40px !important;
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.wallet-adapter-modal-button-close:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  color: white !important;
+  transform: scale(1.05) !important;
+}
+
+.wallet-adapter-modal-button-close svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+/* Mobile Responsive Improvements */
+@media (max-width: 640px) {
+  .wallet-adapter-modal-overlay {
+    padding: 16px !important;
+  }
+  
+  .wallet-adapter-modal-container {
+    max-width: 100% !important;
+    border-radius: 20px !important;
+  }
+  
+  .wallet-adapter-modal-wrapper {
+    padding: 24px !important;
+    border-radius: 20px !important;
+  }
+  
+  .wallet-adapter-modal-title {
+    font-size: 20px !important;
+  }
+  
+  .wallet-adapter-modal-list-item button {
+    padding: 16px !important;
+    font-size: 14px !important;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .wallet-adapter-modal-container {
+    background: rgba(10, 10, 10, 0.95);
+    border: 1px solid rgba(212, 172, 84, 0.2);
+    color: white;
+  }
+}
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ffffff;
+  --card: rgba(24, 22, 21, 0.7);
+  --card-foreground: #ffffff;
+  --popover: rgba(24, 22, 21, 0.95);
+  --popover-foreground: #ffffff;
+  --primary: #D4AC54;
+  --primary-foreground: #181615;
+  --secondary: rgba(212, 172, 84, 0.2);
+  --secondary-foreground: #ffffff;
+  --muted: rgba(212, 172, 84, 0.05);
+  --muted-foreground: #a1a1aa;
+  --accent: rgba(212, 172, 84, 0.1);
+  --accent-foreground: #D4AC54;
+  --destructive: #DC8850;
+  --destructive-foreground: #ffffff;
+  --border: rgba(212, 172, 84, 0.1);
+  --input: rgba(212, 172, 84, 0.05);
+  --ring: #D4AC54;
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--gradient-dark);
+  color: var(--foreground);
+  font-family: 'Inter', var(--font-sans), Arial, Helvetica, sans-serif;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Golden Background Pattern */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(212, 172, 84, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(235, 197, 123, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 40% 80%, rgba(224, 184, 102, 0.08) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Modern Crypto Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.crypto-text-gradient {
+  background: var(--gradient-crypto);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Utility classes */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
+}
+
+/* Animation for loading states */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Focus styles */
+.focus-visible\:ring-2:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000);
+  --tw-ring-color: var(--ring);
+  --tw-ring-shadow: 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+}

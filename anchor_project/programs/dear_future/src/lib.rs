@@ -1,13 +1,12 @@
 #![allow(unexpected_cfgs)]
 
 use anchor_lang::prelude::*;
+use crate::instructions::*;
 
 pub mod instructions;
 pub mod state;
 pub mod errors;
 pub mod events;
-
-use instructions::*;
 
 declare_id!("5BY4zzPL5qWSwDeArRD82YpSY1utsJGBsgNisTPpuHTm");
 
@@ -46,35 +45,11 @@ pub mod dear_future {
         instructions::unlock_capsule::handler(ctx)
     }
 
-    // // Close a memory capsule
-    // pub fn close_capsule(
-    //     ctx: Context<CloseCapsule>,
-    // ) -> Result<()> {
-    //     instructions::close_capsule::handler(ctx)
-    // }
-
-    // // Mint a pNFT for a memory capsule
-    // pub fn mint_capsule_pnft(
-    //     ctx: Context<MintCapsulePnft>,
-    //     name: String,
-    //     symbol: String,
-    //     uri: String,
-    // ) -> Result<()> {
-    //     instructions::mint_capsule_pnft::handler(ctx, name, symbol, uri)
-    // }
-
-    // // Lock the capsule's pNFT
-    // pub fn lock_capsule_pnft(
-    //     ctx: Context<LockCapsulePnft>,
-    // ) -> Result<()> {
-    //     instructions::lock_capsule_pnft::handler(ctx)
-    // }
-
-    // // Unlock the capsule's pNFT
-    // pub fn unlock_capsule_pnft(
-    //     ctx: Context<UnlockCapsulePnft>,
-    // ) -> Result<()> {
-    //     instructions::unlock_capsule_pnft::handler(ctx)
-    // }
+    // Close a memory capsule
+    pub fn close_capsule(
+        ctx: Context<CloseCapsule>,
+    ) -> Result<()> {
+        instructions::close_capsule::handler(ctx)
+    }
 
 }
