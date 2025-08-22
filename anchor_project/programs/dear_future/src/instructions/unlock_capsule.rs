@@ -5,12 +5,13 @@ use crate::{state::Capsule, errors::ErrorCode, events::CapsuleUnlocked};
 pub struct UnlockCapsule<'info> {
     #[account(
         mut,
-        seeds = [Capsule::SEED, capsule.creator.key().as_ref(), &capsule.id.to_le_bytes()],
+        seeds = [Capsule::SEED, capsule.creator.as_ref(), &capsule.id.to_le_bytes()],
         bump = capsule.bump,
+        constraint = capsule.owner == owner.key() @ ErrorCode::NotOwner,
     )]
     pub capsule: Account<'info, Capsule>,
     
-    pub unlocker: Signer<'info>,
+    pub owner: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<UnlockCapsule>) -> Result<()> {
@@ -27,7 +28,7 @@ pub fn handler(ctx: Context<UnlockCapsule>) -> Result<()> {
     
     emit!(CapsuleUnlocked {
         capsule: capsule.key(),
-        unlocker: ctx.accounts.unlocker.key(),
+        unlocker: ctx.accounts.owner.key(),
         timestamp: clock.unix_timestamp,
     });
     

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Calendar, Lock, Unlock, Share2, Send, Eye, Loader2, ArrowRightLeft, ExternalLink } from 'lucide-react';
+import { Clock, Calendar, Lock, Unlock, Share2, Eye, Loader2, ArrowRightLeft, ExternalLink, Maximize2, X } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import bs58 from 'bs58';
 import { useAppStore, Capsule } from '@/stores/appStore';
@@ -13,7 +13,7 @@ import { solanaService } from '@/services/solana';
 import { encryptionService } from '@/services/encryption';
 import { nftService, CNFTMintOptions } from '@/services/nft';
 import { cnftService } from '@/services/cnft';
-import { DasApiAsset, MintTransactionStatus } from '@/services/helius-das';
+import { MintTransactionStatus } from '@/services/helius-das';
 import { PublicKey } from '@solana/web3.js';
 
 export function MyCapsules() {
@@ -23,14 +23,16 @@ export function MyCapsules() {
   const [selectedCapsule, setSelectedCapsule] = useState<Capsule | null>(null);
   const [unlockingCapsule, setUnlockingCapsule] = useState<string | null>(null);
   const [mintingCapsule, setMintingCapsule] = useState<string | null>(null);
-  const [mintAsCompressed, setMintAsCompressed] = useState(true);
+  const [mintAsCompressed] = useState(true);
   const [mintProgress, setMintProgress] = useState(0);
   const [mintStatus, setMintStatus] = useState<string>('');
   const [showMintDialog, setShowMintDialog] = useState<string | null>(null);
   const [showTransferDialog, setShowTransferDialog] = useState<string | null>(null);
   const [transferAddress, setTransferAddress] = useState('');
   const [transferring, setTransferring] = useState<string | null>(null);
+  const [transferCNFT, setTransferCNFT] = useState(false);
   const [showNFTViewer, setShowNFTViewer] = useState<string | null>(null);
+  const [showFullscreenImage, setShowFullscreenImage] = useState<string | null>(null);
 
   // Utility function to convert signature to base58 format
   const convertSignatureToBase58 = (signature: unknown): string => {
@@ -78,10 +80,10 @@ export function MyCapsules() {
 
 
       // Transform Solana data to our app format
-      const transformedCapsules: Capsule[] = await Promise.all(solanaCapsules.map(async (solanaCapsule: any) => {
+      const transformedCapsules: Capsule[] = await Promise.all(solanaCapsules.map(async (solanaCapsule: Record<string, unknown>) => {
         let contentData;
         try {
-          contentData = JSON.parse(solanaCapsule.content);
+          contentData = JSON.parse(solanaCapsule.content as string);
         } catch {
           contentData = { description: solanaCapsule.content };
         }
@@ -100,12 +102,12 @@ export function MyCapsules() {
                 iv: contentData.encryptedImageIv
               },
               publicKey!,
-              solanaCapsule.title,
-              solanaCapsule.unlockDate.toNumber(),
+              solanaCapsule.title as string,
+              (solanaCapsule.unlockDate as any).toNumber(),
               publicKey!.toString() // Use current wallet key, not creator from blockchain
             );
             imageUrl = decryptedImageUrl.decryptedUrl;
-          } catch (error) {
+          } catch {
             // Try alternative decryption methods
             try {
               // Try with different key derivation parameters
@@ -115,42 +117,42 @@ export function MyCapsules() {
                   iv: contentData.encryptedImageIv
                 },
                 publicKey!,
-                solanaCapsule.title.trim(), // Try trimmed title
-                solanaCapsule.unlockDate.toNumber(),
+                (solanaCapsule.title as string).trim(), // Try trimmed title
+                (solanaCapsule.unlockDate as any).toNumber(),
                 publicKey!.toString() // Use current wallet key
               );
               imageUrl = decryptedImageUrl.decryptedUrl;
-            } catch (altError) {
+            } catch {
               imageUrl = '';
             }
           }
         } else if (!solanaCapsule.isUnlocked && contentData.encryptedImageUrl) {
           // Check if capsule is ready to be unlocked (time has passed)
           const currentTime = Math.floor(Date.now() / 1000);
-          if (solanaCapsule.unlockDate.toNumber() <= currentTime) {
+          if ((solanaCapsule.unlockDate as any).toNumber() <= currentTime) {
             // The unlock button will be shown to the user
           }
         }
 
         const capsule = {
-          id: solanaCapsule.address,
-          mint: solanaCapsule.mint?.toString() || '',
-          name: solanaCapsule.title,
+          id: solanaCapsule.address as string,
+          mint: (solanaCapsule.mint as any)?.toString() || '',
+          name: solanaCapsule.title as string,
           description: contentData.description || 'No description',
           imageUrl: imageUrl,
-          unlockDate: new Date(solanaCapsule.unlockDate.toNumber() * 1000),
-          createdAt: new Date(solanaCapsule.createdAt.toNumber() * 1000),
-          owner: solanaCapsule.owner?.toString() || solanaCapsule.creator.toString(), // Use owner if available, fallback to creator
+          unlockDate: new Date((solanaCapsule.unlockDate as any).toNumber() * 1000),
+          createdAt: new Date((solanaCapsule.createdAt as any).toNumber() * 1000),
+          owner: (solanaCapsule.owner as any)?.toString() || (solanaCapsule.creator as any).toString(), // Use owner if available, fallback to creator
           isLocked: !solanaCapsule.isUnlocked,
           metadata: {
             attributes: [
-              { trait_type: 'Unlock Date', value: new Date(solanaCapsule.unlockDate.toNumber() * 1000).toISOString() },
+              { trait_type: 'Unlock Date', value: new Date((solanaCapsule.unlockDate as any).toNumber() * 1000).toISOString() },
               { trait_type: 'Status', value: solanaCapsule.isUnlocked ? 'Unlocked' : 'Locked' },
-              { trait_type: 'Creator', value: solanaCapsule.creator.toString() }
+              { trait_type: 'Creator', value: (solanaCapsule.creator as any).toString() }
             ],
-            creator: solanaCapsule.creator.toString(),
-            transferredAt: solanaCapsule.transferredAt ? solanaCapsule.transferredAt.toNumber() : null,
-            mintCreator: solanaCapsule.mintCreator?.toString() || null
+            creator: (solanaCapsule.creator as any).toString(),
+            transferredAt: (solanaCapsule.transferredAt as any) ? (solanaCapsule.transferredAt as any).toNumber() : null,
+            mintCreator: (solanaCapsule.mintCreator as any)?.toString() || null
           }
         };
 
@@ -174,7 +176,7 @@ export function MyCapsules() {
                 mintSignature: nftData.mintSignature
               }
             };
-          } catch (e) {
+          } catch {
             // Failed to parse saved NFT status
           }
         }
@@ -182,7 +184,7 @@ export function MyCapsules() {
       });
       
       setUserCapsules(capsulesWithNFTStatus);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load capsules. Please refresh and try again.');
     } finally {
       setLoading(false);
@@ -203,10 +205,7 @@ export function MyCapsules() {
     alert('Share link copied to clipboard!');
   };
 
-  const handleTransferCapsule = (_capsule: Capsule) => {
-
-    alert('Transfer functionality coming soon!');
-  };
+  // Removed unused function - transfer functionality is handled by handleTransferNFT
 
   const handleMintNFT = async (capsule: Capsule) => {
     if (!publicKey || !signTransaction || !signMessage) {
@@ -348,17 +347,70 @@ export function MyCapsules() {
     }
   };
 
+  // Helper function to check if capsule has an associated CNFT
+  const hasAssociatedCNFT = (capsule: Capsule): boolean => {
+    return !!(capsule.mint && capsule.metadata?.assetId);
+  };
+
+  // Helper function to check if current user is the capsule owner
+  const isCurrentOwner = (capsule: Capsule): boolean => {
+    return capsule.owner === publicKey?.toString();
+  };
+
+  // Helper function to get transfer button text and state
+  const getTransferButtonInfo = (capsule: Capsule): { text: string; canTransfer: boolean; transferType: 'capsule' | 'cnft' | 'both' | 'none' | 'cnft-only' } => {
+    const isOwner = isCurrentOwner(capsule);
+    const hasCNFT = hasAssociatedCNFT(capsule);
+    
+    if (!isOwner) {
+      // Check if this is a transferred capsule with CNFT
+      if (hasCNFT) {
+        return { text: 'Transfer cNFT', canTransfer: true, transferType: 'cnft-only' };
+      }
+      return { text: 'Not Owner', canTransfer: false, transferType: 'none' };
+    }
+    
+    if (hasCNFT) {
+      return { text: 'Transfer Capsule & cNFT', canTransfer: true, transferType: 'both' };
+    }
+    
+    return { text: 'Transfer Capsule', canTransfer: true, transferType: 'capsule' };
+  };
+
+  // Helper function to get transfer button text for display
+  const getTransferButtonText = (capsule: Capsule): string => {
+    const { text } = getTransferButtonInfo(capsule);
+    return text;
+  };
+
   const handleTransferNFT = async (capsule: Capsule) => {
-    if (!publicKey || !signTransaction || !signMessage || !transferAddress.trim()) {
-      toast.error('Please enter a valid transfer address');
+    if (!publicKey || !signTransaction || !signMessage) return;
+
+    // Check if this is a CNFT-only transfer (transferred capsule)
+    const isTransferredCapsule = !isCurrentOwner(capsule) && hasAssociatedCNFT(capsule);
+    
+    if (isTransferredCapsule) {
+      // Handle CNFT-only transfer
+      await handleCNFTOnlyTransfer(capsule);
+      return;
+    }
+
+    // Validate that the current user is the capsule owner
+    if (capsule.owner !== publicKey.toString()) {
+      toast.error('Only the capsule owner can transfer this capsule');
+      return;
+    }
+
+    const cleanAddress = transferAddress.trim();
+    if (!cleanAddress) {
+      toast.error('Please enter a valid recipient address');
       return;
     }
 
     try {
-      // Validate the address
-      new PublicKey(transferAddress);
-    } catch (error) {
-      toast.error('Invalid Solana address');
+      new PublicKey(cleanAddress);
+    } catch {
+      toast.error('Please enter a valid Solana wallet address');
       return;
     }
 
@@ -367,17 +419,54 @@ export function MyCapsules() {
     try {
       toast.loading('Transferring capsule...', { id: 'transfer' });
 
+      console.log('Starting capsule transfer:', {
+        capsuleId: capsule.id,
+        fromAddress: publicKey.toString(),
+        toAddress: cleanAddress,
+        transferType: transferCNFT ? 'capsule-and-cnft' : 'capsule-only'
+      });
+
       // Transfer the capsule using the Solana service
-      const result = await solanaService.transferCapsule(
+      const transferResult = await solanaService.transferCapsule(
         {
           publicKey,
           signTransaction: signTransaction!,
           signMessage: signMessage!
         },
         capsule.id,
-        transferAddress,
-        capsule.metadata?.mintSignature // Pass mint signature as mint address
+        cleanAddress,
+        transferCNFT ? capsule.mint : undefined // Include mint address if transferring CNFT
       );
+
+      // If CNFT transfer is requested and the capsule has a mint address
+      if (transferCNFT && capsule.mint && capsule.metadata?.assetId) {
+        try {
+          toast.loading('Transferring CNFT...', { id: 'cnft-transfer' });
+          
+          // Initialize CNFT service with the wallet
+          await cnftService.initialize({
+            publicKey,
+            signTransaction: signTransaction!,
+            signMessage: signMessage!
+          });
+
+          // Transfer the CNFT
+          const cnftTransferSignature = await cnftService.transferCNFT({
+            assetId: capsule.metadata.assetId,
+            newOwner: cleanAddress, // Pass as string, CNFT service will convert
+          });
+
+          console.log('CNFT transfer successful:', cnftTransferSignature);
+          toast.success('🎉 CNFT transferred successfully!', { id: 'cnft-transfer' });
+        } catch (cnftError) {
+          console.error('CNFT transfer failed:', cnftError);
+          toast.error(`CNFT transfer failed: ${cnftError instanceof Error ? cnftError.message : 'Unknown error'}`, { id: 'cnft-transfer' });
+          // Note: Capsule transfer was successful, but CNFT transfer failed
+        }
+      } else if (transferCNFT && (!capsule.mint || !capsule.metadata?.assetId)) {
+        // User requested CNFT transfer but capsule doesn't have associated CNFT
+        toast.error('⚠️ CNFT transfer requested but this capsule has no associated compressed NFT', { id: 'cnft-transfer' });
+      }
 
       toast.success('🎉 Capsule transferred successfully!', { id: 'transfer' });
 
@@ -391,12 +480,72 @@ export function MyCapsules() {
       }, 1000);
 
     } catch (error) {
+      console.error('Transfer error details:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast.error(`Transfer failed: ${errorMessage}`, { id: 'transfer' });
     } finally {
       setTransferring(null);
       setShowTransferDialog(null);
       setTransferAddress('');
+      setTransferCNFT(false);
+    }
+  };
+
+  const handleCNFTOnlyTransfer = async (capsule: Capsule) => {
+    if (!publicKey || !signTransaction || !signMessage) return;
+
+    const cleanAddress = transferAddress.trim();
+    if (!cleanAddress) {
+      toast.error('Please enter a valid recipient address');
+      return;
+    }
+
+    try {
+      new PublicKey(cleanAddress);
+    } catch {
+      toast.error('Please enter a valid Solana wallet address');
+      return;
+    }
+
+    setTransferring(capsule.id);
+
+    try {
+      toast.loading('Transferring CNFT...', { id: 'cnft-transfer' });
+
+      console.log('Starting CNFT-only transfer:', {
+        capsuleId: capsule.id,
+        fromAddress: publicKey.toString(),
+        toAddress: cleanAddress,
+      });
+
+      // Initialize CNFT service with the wallet
+      await cnftService.initialize({
+        publicKey,
+        signTransaction: signTransaction!,
+        signMessage: signMessage!
+      });
+
+      // Transfer the CNFT
+      const cnftTransferSignature = await cnftService.transferCNFT({
+        assetId: capsule.metadata.assetId!,
+        newOwner: cleanAddress, // Pass as string, CNFT service will convert
+      });
+
+      console.log('CNFT transfer successful:', cnftTransferSignature);
+      toast.success('🎉 CNFT transferred successfully!', { id: 'cnft-transfer' });
+
+      // Note: Capsule ownership remains unchanged for CNFT-only transfers
+      // Just close the dialog and show success message
+
+    } catch (error) {
+      console.error('CNFT-only transfer error details:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`CNFT-only transfer failed: ${errorMessage}`, { id: 'cnft-transfer' });
+    } finally {
+      setTransferring(null);
+      setShowTransferDialog(null);
+      setTransferAddress('');
+      setTransferCNFT(false);
     }
   };
 
@@ -405,11 +554,9 @@ export function MyCapsules() {
 
     setUnlockingCapsule(capsule.id);
     try {
-      let unlockResult;
-      
       if (capsule.isLocked) {
         // Unlock the capsule on Solana
-        unlockResult = await solanaService.unlockCapsule(
+        await solanaService.unlockCapsule(
           {
             publicKey,
             signTransaction: signTransaction!,
@@ -417,16 +564,6 @@ export function MyCapsules() {
           },
           capsule.id
         );
-      } else {
-        // Capsule is already unlocked, just try to decrypt the image
-        unlockResult = {
-          decryptedImageUrl: JSON.stringify({
-            description: capsule.description,
-            encryptedImageUrl: '', // We'll get this from the capsule data
-            encryptedImageIv: ''
-          }),
-          encryptedUrl: ''
-        };
       }
 
       // Get the encrypted data from the capsule content
@@ -437,14 +574,14 @@ export function MyCapsules() {
         signMessage: signMessage!
       });
       
-      const currentCapsule = solanaCapsules.find((c: any) => c.address === capsule.id);
+      const currentCapsule = solanaCapsules.find((c: Record<string, unknown>) => c.address as string === capsule.id);
       if (!currentCapsule) {
         throw new Error('Capsule not found');
       }
       
       let contentData;
       try {
-        contentData = JSON.parse(currentCapsule.content);
+        contentData = JSON.parse(currentCapsule.content as string);
       } catch {
         throw new Error('Failed to parse capsule content');
       }
@@ -473,7 +610,7 @@ export function MyCapsules() {
       // Reload capsules to get fresh data
       await loadUserCapsules();
 
-    } catch (error) {
+    } catch {
       toast.error('Failed to unlock capsule. Please try again.');
     } finally {
       setUnlockingCapsule(null);
@@ -501,10 +638,10 @@ export function MyCapsules() {
 
   if (!connected) {
     return (
-      <Card className="max-w-2xl mx-auto mx-4 md:mx-auto">
+      <Card className="max-w-2xl mx-auto mx-4 md:mx-auto border-amber-400/30 bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 backdrop-blur-xl">
         <CardHeader className="text-center p-4 md:p-6">
-          <CardTitle className="text-lg md:text-xl">Connect Your Wallet</CardTitle>
-          <CardDescription className="text-sm md:text-base">
+          <CardTitle className="text-lg md:text-xl text-white">Connect Your Wallet</CardTitle>
+          <CardDescription className="text-sm md:text-base text-gray-300">
             Please connect your wallet to view your memory capsules
           </CardDescription>
         </CardHeader>
@@ -514,15 +651,15 @@ export function MyCapsules() {
 
   if (loading) {
     return (
-      <Card className="max-w-2xl mx-auto mx-4 md:mx-auto">
+      <Card className="max-w-2xl mx-auto mx-4 md:mx-auto border-amber-400/30 bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 backdrop-blur-xl">
         <CardHeader className="text-center p-4 md:p-6">
-          <CardTitle className="text-lg md:text-xl">Loading Your Capsules...</CardTitle>
-          <CardDescription className="text-sm md:text-base">
+          <CardTitle className="text-lg md:text-xl text-white">Loading Your Capsules...</CardTitle>
+          <CardDescription className="text-sm md:text-base text-gray-300">
             Fetching your memory capsules from the blockchain
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center p-6">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-purple-600" />
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-amber-400" />
         </CardContent>
       </Card>
     );
@@ -530,11 +667,11 @@ export function MyCapsules() {
 
   if (userCapsules.length === 0) {
     return (
-      <Card className="max-w-2xl mx-auto mx-4 md:mx-auto">
+      <Card className="max-w-2xl mx-auto mx-4 md:mx-auto border-amber-400/30 bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 backdrop-blur-xl">
         <CardHeader className="text-center p-4 md:p-6">
-          <CardTitle className="text-lg md:text-xl">No Capsules Found</CardTitle>
-          <CardDescription className="text-sm md:text-base">
-            You haven't created any memory capsules yet. Create your first one to get started!
+          <CardTitle className="text-lg md:text-xl text-white">No Capsules Found</CardTitle>
+          <CardDescription className="text-sm md:text-base text-gray-300">
+            You haven&apos;t created any memory capsules yet. Create your first one to get started!
           </CardDescription>
         </CardHeader>
       </Card>
@@ -542,10 +679,10 @@ export function MyCapsules() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 px-4 md:px-0">
+    <div className="max-w-7xl mx-auto space-y-8 px-4 md:px-0">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900">My Memory Capsules</h2>
-        <p className="text-gray-600 mt-2">
+        <h2 className="text-4xl md:text-5xl font-black mb-6 crypto-text-gradient">My Memory Capsules</h2>
+        <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
           Manage and unlock your time-locked memories
         </p>
         <Button
@@ -553,342 +690,499 @@ export function MyCapsules() {
           disabled={loading}
           variant="outline"
           size="sm"
-          className="mt-4"
+          className="mt-6 border-amber-400/30 text-amber-300 hover:bg-amber-400/10 hover:border-amber-400/60"
         >
           {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
           Refresh Capsules
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
         {userCapsules.map((capsule) => (
-          <Card key={capsule.id} className="overflow-hidden">
-            <div className="aspect-square bg-gray-100 flex items-center justify-center">
-              {capsule.imageUrl && !capsule.isLocked ? (
-                <img
-                  src={capsule.imageUrl}
-                  alt={capsule.name}
-                  className="w-full h-full object-cover"
-                />
+          <div
+            key={capsule.id}
+            className="group relative bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-700 transform hover:-translate-y-3 border border-amber-400/30 backdrop-blur-xl overflow-hidden hover:border-amber-400/60"
+          >
+            {/* Status Badge */}
+            <div className="absolute top-4 right-4 z-10">
+              {capsule.isLocked ? (
+                isUnlocked(capsule.unlockDate) ? (
+                  <div className="flex items-center gap-1 bg-gradient-to-r from-amber-400 to-orange-500 text-black px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
+                    <Unlock className="h-3 w-3" />
+                    Ready
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 bg-gradient-to-r from-gray-500 to-gray-700 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
+                    <Lock className="h-3 w-3" />
+                    Locked
+                  </div>
+                )
               ) : (
-                <div className="text-center p-4">
-                  {capsule.isLocked ? (
-                    isUnlocked(capsule.unlockDate) ? (
-                      <div>
-                        <Unlock className="mx-auto h-12 w-12 text-amber-500" />
-                        <p className="text-sm text-amber-600 mt-2 font-medium">Ready to Unlock!</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <Lock className="mx-auto h-12 w-12 text-gray-400" />
-                        <p className="text-sm text-gray-500 mt-2">Locked</p>
-                      </div>
-                    )
-                  ) : (
-                    <div>
-                      {capsule.imageUrl ? (
-                        <div>
-                          <img
-                            src={capsule.imageUrl}
-                            alt={capsule.name}
-                            className="mx-auto max-h-32 rounded"
-                          />
-                          <p className="text-sm text-green-600 mt-2">Image Loaded</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <Unlock className="mx-auto h-12 w-12 text-green-400" />
-                          <p className="text-sm text-green-600 mt-2">Unlocked (No Image)</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                <div className="flex items-center gap-1 bg-gradient-to-r from-emerald-400 to-green-500 text-black px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
+                  <Unlock className="h-3 w-3" />
+                  Unlocked
                 </div>
               )}
             </div>
 
-            <CardContent className="p-4">
-              <div className="space-y-3">
-                <div>
-                  <h3 className="font-semibold text-lg truncate">{capsule.name}</h3>
-                  <p className="text-sm text-gray-600 line-clamp-2">
-                    {capsule.description}
-                  </p>
+            {/* NFT Badge */}
+            {capsule.metadata?.nftMinted && (
+              <div className="absolute top-4 left-4 z-10">
+                <div className="flex items-center gap-1 bg-gradient-to-r from-purple-500 to-violet-600 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
+                  <Lock className="h-3 w-3" />
+                  cNFT
                 </div>
+              </div>
+            )}
 
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Calendar className="h-4 w-4" />
-                  <span>
-                    {capsule.isLocked ? 'Unlocks' : 'Unlocked'}: {formatDate(capsule.unlockDate)}
-                  </span>
+            {/* Gradient Overlay Effect */}
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-400/15 via-yellow-500/10 to-orange-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+            <div className="absolute top-4 right-4 w-24 h-24 bg-gradient-to-br from-amber-400/20 to-yellow-500/20 rounded-full blur-2xl"></div>
+
+            {/* Image Section */}
+            <div className="relative h-64 overflow-hidden bg-black/30">
+              {capsule.imageUrl && !capsule.isLocked ? (
+                <div className="relative h-full">
+                  <img
+                    src={capsule.imageUrl}
+                    alt={capsule.name}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center bg-gray-800/50">
+                  <div className="text-center p-6">
+                    {capsule.isLocked ? (
+                      isUnlocked(capsule.unlockDate) ? (
+                        <div className="space-y-3">
+                          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
+                            <Unlock className="h-8 w-8 text-white" />
+                          </div>
+                          <p className="text-sm font-semibold text-amber-600">Ready to Unlock!</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center shadow-lg">
+                            <Lock className="h-8 w-8 text-white" />
+                          </div>
+                          <p className="text-sm font-medium text-gray-500">Time Locked</p>
+                        </div>
+                      )
+                    ) : (
+                      <div className="space-y-3">
+                        {capsule.imageUrl ? (
+                          <div>
+                            <img
+                              src={capsule.imageUrl}
+                              alt={capsule.name}
+                              className="mx-auto max-h-32 rounded-lg shadow-md"
+                            />
+                            <p className="text-sm font-medium text-green-600 mt-2">Memory Revealed</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                              <Unlock className="h-8 w-8 text-white" />
+                            </div>
+                            <p className="text-sm font-medium text-green-600 mt-2">Unlocked</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Content Section */}
+            <div className="relative z-10 p-8 space-y-6">
+              {/* Title and Description */}
+              <div className="space-y-3">
+                <h3 className="font-black text-2xl text-white truncate group-hover:text-amber-400 transition-colors duration-300">
+                  {capsule.name}
+                </h3>
+                <p className="text-base text-gray-300 line-clamp-2 leading-relaxed">
+                  {capsule.description}
+                </p>
+              </div>
+
+              {/* Metadata */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="flex items-center gap-2 bg-white/5 px-4 py-2.5 rounded-xl border border-amber-400/20">
+                    <Calendar className="h-4 w-4 text-amber-300" />
+                    <span className="font-semibold text-white">
+                      {capsule.isLocked ? 'Unlocks' : 'Unlocked'}: {formatDate(capsule.unlockDate)}
+                    </span>
+                  </div>
                 </div>
 
                 {capsule.isLocked && (
-                  <div className="flex items-center gap-2 text-sm text-amber-600">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {isUnlocked(capsule.unlockDate) ? 'Ready to Unlock!' : getTimeUntilUnlock(capsule.unlockDate)}
-                    </span>
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border ${
+                      isUnlocked(capsule.unlockDate)
+                        ? 'bg-amber-400/20 text-amber-100 border-amber-400/40'
+                        : 'bg-gray-600/20 text-gray-300 border-gray-500/30'
+                    }`}>
+                      <Clock className="h-4 w-4" />
+                      <span className="font-semibold">
+                        {isUnlocked(capsule.unlockDate) ? 'Ready to Unlock!' : getTimeUntilUnlock(capsule.unlockDate)}
+                      </span>
+                    </div>
                   </div>
                 )}
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewCapsule(capsule)}
-                    className="flex-1"
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    View
-                  </Button>
-
-                  {capsule.isLocked && isUnlocked(capsule.unlockDate) && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleUnlockCapsule(capsule)}
-                      disabled={unlockingCapsule === capsule.id}
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                    >
-                      {unlockingCapsule === capsule.id ? (
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                      ) : (
-                        <Unlock className="h-4 w-4 mr-1" />
-                      )}
-                      Unlock
-                    </Button>
-                  )}
-                  
-                  {!capsule.isLocked && !capsule.imageUrl && isUnlocked(capsule.unlockDate) && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleUnlockCapsule(capsule)}
-                      disabled={unlockingCapsule === capsule.id}
-                      className="flex-1 bg-amber-600 hover:bg-amber-700"
-                    >
-                      {unlockingCapsule === capsule.id ? (
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                      ) : (
-                        <Unlock className="h-4 w-4 mr-1" />
-                      )}
-                      Re-unlock
-                    </Button>
-                  )}
-
-                  {!capsule.isLocked && (
-                    <>
-                      {/* Show Mint NFT button only if NFT is not minted */}
-                      {!capsule.metadata?.nftMinted && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowMintDialog(capsule.id)}
-                          className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
-                          disabled={mintingCapsule === capsule.id}
-                        >
-                          {mintingCapsule === capsule.id ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <Lock className="h-4 w-4 mr-1" />
-                          )}
-                          Mint cNFT
-                        </Button>
-                      )}
-
-                      {/* Show Transfer button only if NFT is minted */}
-                      {capsule.metadata?.nftMinted && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowTransferDialog(capsule.id)}
-                          className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-                          disabled={transferring === capsule.id}
-                        >
-                          {transferring === capsule.id ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <ArrowRightLeft className="h-4 w-4 mr-1" />
-                          )}
-                          Transfer cNFT
-                        </Button>
-                      )}
-
-                      {/* View NFT button for minted NFTs */}
-                      {capsule.metadata?.nftMinted && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowNFTViewer(capsule.id)}
-                          className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View cNFT
-                        </Button>
-                      )}
-
-                      {/* Share button for non-minted capsules */}
-                      {!capsule.metadata?.nftMinted && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleShareCapsule(capsule)}
-                          className="flex-1"
-                        >
-                          <Share2 className="h-4 w-4 mr-1" />
-                          Share
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleViewCapsule(capsule)}
+                  className="flex-1 min-w-[120px] bg-white/5 hover:bg-amber-400/10 border-amber-400/30 hover:border-amber-400/60 text-white hover:text-amber-100 transition-all duration-300 px-4 py-2.5 rounded-xl"
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  <span className="font-semibold">View</span>
+                </Button>
+
+                {capsule.isLocked && isUnlocked(capsule.unlockDate) && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleUnlockCapsule(capsule)}
+                    disabled={unlockingCapsule === capsule.id}
+                    className="flex-1 min-w-[120px] bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 px-4 py-2.5 rounded-xl"
+                  >
+                    {unlockingCapsule === capsule.id ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Unlock className="h-4 w-4 mr-2" />
+                    )}
+                    <span className="font-semibold">Unlock</span>
+                  </Button>
+                )}
+                
+                {!capsule.isLocked && !capsule.imageUrl && isUnlocked(capsule.unlockDate) && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleUnlockCapsule(capsule)}
+                    disabled={unlockingCapsule === capsule.id}
+                    className="flex-1 min-w-[120px] bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 px-4 py-2.5 rounded-xl"
+                  >
+                    {unlockingCapsule === capsule.id ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Unlock className="h-4 w-4 mr-2" />
+                    )}
+                    <span className="font-semibold">Re-unlock</span>
+                  </Button>
+                )}
+
+                {!capsule.isLocked && (
+                  <>
+                    {/* Show Mint NFT button only if NFT is not minted */}
+                    {!capsule.metadata?.nftMinted && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowMintDialog(capsule.id)}
+                        className="flex-1 min-w-[120px] bg-white/5 hover:bg-purple-400/10 text-white hover:text-purple-200 border-purple-400/30 hover:border-purple-400/60 transition-all duration-300 px-4 py-2.5 rounded-xl"
+                        disabled={mintingCapsule === capsule.id}
+                      >
+                        {mintingCapsule === capsule.id ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Lock className="h-4 w-4 mr-2" />
+                        )}
+                        <span className="font-semibold">Mint cNFT</span>
+                      </Button>
+                    )}
+
+                    {/* Transfer Button - Only show for capsule owners */}
+                    {isCurrentOwner(capsule) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const { transferType } = getTransferButtonInfo(capsule);
+                          setShowTransferDialog(capsule.id);
+                          setTransferCNFT(transferType === 'both'); // Enable CNFT transfer only if both are available
+                        }}
+                        className="flex-1 min-w-[120px] bg-white/5 hover:bg-blue-400/10 text-white hover:text-blue-200 border-blue-400/30 hover:border-blue-400/60 transition-all duration-300 px-4 py-2.5 rounded-xl"
+                        disabled={transferring === capsule.id || !getTransferButtonInfo(capsule).canTransfer}
+                      >
+                        <ArrowRightLeft className="mr-2 h-4 w-4" />
+                        {getTransferButtonText(capsule)}
+                      </Button>
+                    )}
+
+                    {/* CNFT Transfer Button - Show for transferred capsules with CNFTs */}
+                    {!isCurrentOwner(capsule) && hasAssociatedCNFT(capsule) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setShowTransferDialog(capsule.id);
+                          setTransferCNFT(true); // Always enable CNFT transfer for this case
+                        }}
+                        className="flex-1 min-w-[120px] bg-white/5 hover:bg-purple-400/10 text-white hover:text-purple-200 border-purple-400/30 hover:border-purple-400/60 transition-all duration-300 px-4 py-2.5 rounded-xl"
+                        disabled={transferring === capsule.id}
+                      >
+                        <ArrowRightLeft className="mr-2 h-4 w-4" />
+                        Transfer cNFT
+                      </Button>
+                    )}
+
+                    {/* View NFT button for minted NFTs */}
+                    {capsule.metadata?.nftMinted && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowNFTViewer(capsule.id)}
+                        className="flex-1 min-w-[120px] bg-white/5 hover:bg-green-400/10 text-white hover:text-green-200 border-green-400/30 hover:border-green-400/60 transition-all duration-300 px-4 py-2.5 rounded-xl"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        <span className="font-semibold">View cNFT</span>
+                      </Button>
+                    )}
+
+
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Hover Glow Effect */}
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-amber-400/0 via-yellow-400/0 to-orange-400/0 group-hover:from-amber-400/10 group-hover:via-yellow-400/5 group-hover:to-orange-400/10 transition-all duration-700 pointer-events-none" />
+          </div>
         ))}
       </div>
 
       {/* Capsule Detail Modal */}
       {selectedCapsule && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>{selectedCapsule.name}</CardTitle>
-                <Button variant="ghost" size="sm" onClick={handleCloseCapsule}>
-                  ×
-                </Button>
-              </div>
-              <CardDescription>
-                Created on {formatDatetime(selectedCapsule.createdAt)}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {selectedCapsule.imageUrl && !selectedCapsule.isLocked && (
-                <img
-                  src={selectedCapsule.imageUrl}
-                  alt={selectedCapsule.name}
-                  className="w-full rounded-lg"
-                />
-              )}
-              
-              <div>
-                <h4 className="font-semibold mb-2">Message</h4>
-                <p className="text-gray-700">{selectedCapsule.description}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Status:</span>
-                  <span className={`ml-2 ${selectedCapsule.isLocked ? 'text-amber-600' : 'text-green-600'}`}>
-                    {selectedCapsule.isLocked ? 'Locked' : 'Unlocked'}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium">Unlock Date:</span>
-                  <span className="ml-2">{formatDatetime(selectedCapsule.unlockDate)}</span>
-                </div>
-                <div>
-                  <span className="font-medium">Current Owner:</span>
-                  <span className="ml-2 font-mono text-xs">
-                    {selectedCapsule.owner.slice(0, 4)}...{selectedCapsule.owner.slice(-4)}
-                  </span>
-                </div>
-                {selectedCapsule.metadata?.creator && selectedCapsule.metadata.creator !== selectedCapsule.owner && (
-                  <div>
-                    <span className="font-medium">Original Creator:</span>
-                    <span className="ml-2 font-mono text-xs">
-                      {selectedCapsule.metadata.creator.slice(0, 4)}...{selectedCapsule.metadata.creator.slice(-4)}
-                    </span>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-amber-400/30 backdrop-blur-xl">
+            <div className="relative">
+              {/* Header */}
+              <div className="p-6 pb-4 border-b border-gray-700/30">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold text-white">{selectedCapsule.name}</h2>
+                    <p className="text-sm text-gray-400 flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Created on {formatDatetime(selectedCapsule.createdAt)}
+                    </p>
                   </div>
-                )}
-                {selectedCapsule.metadata?.transferredAt && (
-                  <div>
-                    <span className="font-medium">Transferred:</span>
-                    <span className="ml-2 text-xs">
-                      {new Date(selectedCapsule.metadata.transferredAt * 1000).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-                {selectedCapsule.mint && (
-                  <div>
-                    <span className="font-medium">NFT Mint:</span>
-                    <span className="ml-2 font-mono text-xs">
-                      {selectedCapsule.mint.slice(0, 4)}...{selectedCapsule.mint.slice(-4)}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                {selectedCapsule.isLocked && isUnlocked(selectedCapsule.unlockDate) && (
-                  <Button
-                    onClick={() => handleUnlockCapsule(selectedCapsule)}
-                    disabled={unlockingCapsule === selectedCapsule.id}
-                    className="bg-green-600 hover:bg-green-700"
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleCloseCapsule}
+                    className="text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded-full w-8 h-8 p-0"
                   >
-                    {unlockingCapsule === selectedCapsule.id ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Unlock className="h-4 w-4 mr-2" />
-                    )}
-                    Unlock Capsule
+                    ×
                   </Button>
-                )}
+                </div>
                 
-                <Button variant="outline" onClick={handleCloseCapsule}>
-                  Close
-                </Button>
+                {/* Status Badge */}
+                <div className="mt-4">
+                  {selectedCapsule.isLocked ? (
+                    isUnlocked(selectedCapsule.unlockDate) ? (
+                      <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
+                        <Unlock className="h-4 w-4" />
+                        Ready to Unlock
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-2 bg-gradient-to-r from-gray-400 to-gray-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
+                        <Lock className="h-4 w-4" />
+                        Time Locked
+                      </div>
+                    )
+                  ) : (
+                    <div className="inline-flex items-center gap-2 bg-gradient-to-r from-green-400 to-emerald-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
+                      <Unlock className="h-4 w-4" />
+                      Unlocked
+                    </div>
+                  )}
+                </div>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Content */}
+              <div className="p-8 space-y-8">
+                {/* Image */}
+                {selectedCapsule.imageUrl && !selectedCapsule.isLocked && (
+                  <div className="relative overflow-hidden rounded-2xl shadow-lg group">
+                    <img
+                      src={selectedCapsule.imageUrl}
+                      alt={selectedCapsule.name}
+                      className="w-full h-80 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+
+                    {/* Fullscreen Icon */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowFullscreenImage(selectedCapsule.imageUrl)}
+                      className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 border-white/30 text-white hover:border-white/60 transition-all duration-300 opacity-0 group-hover:opacity-100"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Message */}
+                <div className="bg-white/5 rounded-2xl p-6 border border-amber-400/20">
+                  <h4 className="font-bold text-white mb-4 flex items-center gap-3">
+                    <div className="w-3 h-3 bg-amber-400 rounded-full"></div>
+                    Memory Message
+                  </h4>
+                  <p className="text-gray-300 leading-relaxed text-lg">{selectedCapsule.description}</p>
+                </div>
+
+                {/* Metadata Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white/5 rounded-xl p-6 border border-amber-400/20">
+                    <div className="flex items-center gap-3 text-base text-gray-300 mb-3">
+                      <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
+                      Status
+                    </div>
+                    <div className={`font-bold text-lg ${selectedCapsule.isLocked ? 'text-amber-400' : 'text-green-400'}`}>
+                      {selectedCapsule.isLocked ? 'Locked' : 'Unlocked'}
+                    </div>
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-6 border border-amber-400/20">
+                    <div className="flex items-center gap-3 text-base text-gray-300 mb-3">
+                      <div className="w-3 h-3 bg-pink-400 rounded-full"></div>
+                      Unlock Date
+                    </div>
+                    <div className="font-bold text-lg text-white">{formatDatetime(selectedCapsule.unlockDate)}</div>
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-6 border border-amber-400/20">
+                    <div className="flex items-center gap-3 text-base text-gray-300 mb-3">
+                      <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                      Current Owner
+                    </div>
+                    <div className="font-mono text-base font-bold text-white">
+                      {selectedCapsule.owner.slice(0, 8)}...{selectedCapsule.owner.slice(-8)}
+                    </div>
+                  </div>
+
+                  {selectedCapsule.metadata?.creator && selectedCapsule.metadata.creator !== selectedCapsule.owner && (
+                    <div className="bg-white/5 rounded-xl p-6 border border-amber-400/20">
+                      <div className="flex items-center gap-3 text-base text-gray-300 mb-3">
+                        <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                        Original Creator
+                      </div>
+                      <div className="font-mono text-base font-bold text-white">
+                        {selectedCapsule.metadata.creator.slice(0, 8)}...{selectedCapsule.metadata.creator.slice(-8)}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedCapsule.metadata?.transferredAt && (
+                    <div className="bg-white/5 rounded-xl p-6 border border-amber-400/20">
+                      <div className="flex items-center gap-3 text-base text-gray-300 mb-3">
+                        <div className="w-3 h-3 bg-orange-400 rounded-full"></div>
+                        Transferred
+                      </div>
+                      <div className="font-bold text-lg text-white">
+                        {new Date(selectedCapsule.metadata.transferredAt * 1000).toLocaleDateString()}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedCapsule.mint && (
+                    <div className="bg-white/5 rounded-xl p-6 border border-amber-400/20">
+                      <div className="flex items-center gap-3 text-base text-gray-300 mb-3">
+                        <div className="w-3 h-3 bg-violet-400 rounded-full"></div>
+                        NFT Mint
+                      </div>
+                      <div className="font-mono text-base font-bold text-white">
+                        {selectedCapsule.mint.slice(0, 8)}...{selectedCapsule.mint.slice(-8)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-wrap gap-4 pt-6">
+                  {selectedCapsule.isLocked && isUnlocked(selectedCapsule.unlockDate) && (
+                    <Button
+                      onClick={() => handleUnlockCapsule(selectedCapsule)}
+                      disabled={unlockingCapsule === selectedCapsule.id}
+                      className="flex-1 min-w-[160px] bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl py-3"
+                    >
+                      {unlockingCapsule === selectedCapsule.id ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Unlock className="h-4 w-4 mr-2" />
+                      )}
+                      Unlock Capsule
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    onClick={handleCloseCapsule}
+                    className="flex-1 min-w-[120px] bg-white/5 hover:bg-amber-400/10 border-amber-400/30 hover:border-amber-400/60 text-white hover:text-amber-100 transition-all duration-300 rounded-xl py-3"
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Mint NFT Dialog */}
       {showMintDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-md w-full">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Lock className="h-5 w-5 text-purple-600" />
-                Mint Capsule as NFT
-              </CardTitle>
-              <CardDescription>
-                Choose the type of NFT to mint for your unlocked capsule
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full border border-amber-400/30 backdrop-blur-xl">
+            <div className="p-8">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-500 to-violet-600 rounded-3xl mb-6 shadow-2xl shadow-purple-500/30">
+                  <Lock className="h-10 w-10 text-white" />
+                </div>
+                <h2 className="text-3xl font-black text-white mb-3">Mint Capsule as NFT</h2>
+                <p className="text-lg text-gray-300 leading-relaxed">
+                  Choose the type of NFT to mint for your unlocked capsule
+                </p>
+              </div>
+              <div className="space-y-6">
               {mintingCapsule === showMintDialog ? (
                 // Minting in progress
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div className="text-center">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-purple-600" />
-                    <p className="text-sm font-medium">{mintStatus}</p>
+                    <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-amber-400" />
+                    <p className="text-base font-semibold text-white">{mintStatus}</p>
                   </div>
                   
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-white/10 rounded-full h-3">
                     <div
-                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-gradient-to-r from-amber-400 to-orange-500 h-3 rounded-full transition-all duration-300"
                       style={{ width: `${mintProgress}%` }}
                     />
                   </div>
                   
-                  <p className="text-xs text-center text-gray-500">
+                  <p className="text-sm text-center text-gray-400">
                     {mintProgress}% Complete
                   </p>
                 </div>
               ) : (
                 // NFT type selection
                 <>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="text-center">
-                      <div className="inline-flex items-center gap-2 px-3 py-2 bg-purple-50 rounded-lg">
-                        <Lock className="h-4 w-4 text-purple-600" />
-                        <span className="text-sm font-medium text-purple-700">Compressed NFT (cNFT)</span>
+                      <div className="inline-flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-400/20 to-violet-400/20 rounded-xl border border-purple-400/30">
+                        <Lock className="h-5 w-5 text-purple-400" />
+                        <span className="text-base font-semibold text-purple-300">Compressed NFT (cNFT)</span>
                       </div>
                     </div>
                     
-                    <div className="text-xs text-gray-500 text-center max-w-sm mx-auto">
+                    <div className="text-sm text-gray-400 text-center max-w-sm mx-auto leading-relaxed">
                       <p>
                         <strong>Compressed NFT:</strong> Cost-efficient NFT stored in Merkle trees with real-time WebSocket monitoring. 
                         Perfect for memory capsules with ~99% lower minting costs.
@@ -896,13 +1190,13 @@ export function MyCapsules() {
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex gap-4 pt-6">
                     <Button
                       onClick={() => {
                         const capsule = userCapsules.find(c => c.id === showMintDialog);
                         if (capsule) handleMintNFT(capsule);
                       }}
-                      className="flex-1 bg-purple-600 hover:bg-purple-700"
+                      className="flex-1 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 py-3 rounded-xl font-semibold"
                       disabled={!showMintDialog}
                     >
                       <Lock className="mr-2 h-4 w-4" />
@@ -911,227 +1205,441 @@ export function MyCapsules() {
                     <Button
                       variant="outline"
                       onClick={() => setShowMintDialog(null)}
-                      className="flex-1"
+                      className="flex-1 bg-white/5 hover:bg-amber-400/10 border-amber-400/30 hover:border-amber-400/60 text-white hover:text-amber-100 transition-all duration-300 py-3 rounded-xl font-semibold"
                     >
                       Cancel
                     </Button>
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Transfer cNFT Dialog */}
-      {showTransferDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-md w-full">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <ArrowRightLeft className="h-5 w-5 text-blue-600" />
-                Transfer cNFT
-              </CardTitle>
-              <CardDescription>
-                Transfer your compressed NFT to another wallet
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Recipient Address</label>
-                <input
-                  type="text"
-                  value={transferAddress}
-                  onChange={(e) => setTransferAddress(e.target.value)}
-                  placeholder="Enter Solana wallet address..."
-                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+      {showTransferDialog && (() => {
+        const capsule = userCapsules.find(c => c.id === showTransferDialog);
+        if (!capsule) return null;
+        
+        const { transferType } = getTransferButtonInfo(capsule);
+        const isOwner = isCurrentOwner(capsule);
+        const isTransferredCapsule = !isOwner && hasAssociatedCNFT(capsule);
+        
+        if (!isOwner && !isTransferredCapsule) {
+          return (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full border border-amber-400/30 backdrop-blur-xl">
+                <div className="p-8">
+                  <div className="text-center mb-8">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-400 to-red-600 rounded-3xl mb-6 shadow-2xl shadow-red-400/30">
+                      <X className="h-10 w-10 text-white" />
+                    </div>
+                    <h2 className="text-3xl font-black text-white mb-3">Access Denied</h2>
+                    <p className="text-lg text-gray-300 leading-relaxed">
+                      Only the capsule owner can transfer this capsule
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <Button
+                      onClick={() => {
+                        setShowTransferDialog(null);
+                        setTransferAddress('');
+                        setTransferCNFT(false);
+                      }}
+                      className="bg-white/5 hover:bg-red-400/10 border-red-400/30 hover:border-red-400/60 text-white hover:text-red-100 transition-all duration-300 py-3 px-8 rounded-xl font-semibold"
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
               </div>
+            </div>
+          );
+        }
+        
+        // Determine the actual transfer type for the dialog
+        let dialogTransferType = transferType;
+        if (isTransferredCapsule) {
+          dialogTransferType = 'cnft-only';
+        }
+        
+        return (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+            <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full border border-amber-400/30 backdrop-blur-xl">
+              <div className="p-8">
+                <div className="text-center mb-8">
+                  <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-3xl mb-6 shadow-2xl shadow-amber-400/30">
+                    <ArrowRightLeft className="h-10 w-10 text-black" />
+                  </div>
+                  <h2 className="text-3xl font-black text-white mb-3">
+                    {dialogTransferType === 'both' ? 'Transfer Capsule & cNFT' : 
+                     dialogTransferType === 'cnft-only' ? 'Transfer cNFT' : 'Transfer Capsule'}
+                  </h2>
+                  <p className="text-lg text-gray-300 leading-relaxed">
+                    {dialogTransferType === 'both' 
+                      ? 'Transfer both your memory capsule and the associated cNFT to another wallet'
+                      : dialogTransferType === 'cnft-only'
+                      ? 'Transfer the compressed NFT associated with this capsule to another wallet'
+                      : 'Transfer your memory capsule to another wallet (capsule only, not the NFT)'
+                    }
+                  </p>
+                </div>
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-base font-semibold text-white mb-3 block">Recipient Address</label>
+                    <input
+                      type="text"
+                      value={transferAddress}
+                      onChange={(e) => setTransferAddress(e.target.value.trim())}
+                      placeholder="Enter Solana wallet address (e.g., 7wnLBEm3ftFJobu1yvv25JvyNVqzs4SEKYAfSbimCDN9)"
+                      className="w-full px-4 py-3 border border-amber-400/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400/60 bg-white/5 text-white placeholder-gray-400 font-mono text-sm transition-all duration-300"
+                    />
+                    {transferAddress && (
+                      <div className="mt-3 text-sm">
+                        {(() => {
+                          try {
+                            new PublicKey(transferAddress.trim());
+                            return <span className="text-emerald-400 font-medium">✅ Valid Solana address</span>;
+                          } catch {
+                            return <span className="text-red-400 font-medium">❌ Invalid address format</span>;
+                          }
+                        })()}
+                      </div>
+                    )}
+                  </div>
 
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => {
-                    const capsule = userCapsules.find(c => c.id === showTransferDialog);
-                    if (capsule) handleTransferNFT(capsule);
-                  }}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  disabled={!transferAddress.trim() || transferring === showTransferDialog}
-                >
-                  {transferring === showTransferDialog ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Transferring...
-                    </>
-                  ) : (
-                    <>
-                      <ArrowRightLeft className="mr-2 h-4 w-4" />
-                      Transfer
-                    </>
+                  {/* CNFT Transfer Checkbox - Only show for both transfer types */}
+                  {dialogTransferType === 'both' && (
+                    <div className="flex items-center space-x-3 p-4 bg-white/5 rounded-xl border border-amber-400/20">
+                      <input
+                        type="checkbox"
+                        id="transferCNFT"
+                        checked={transferCNFT}
+                        onChange={(e) => setTransferCNFT(e.target.checked)}
+                        className="w-5 h-5 text-amber-500 bg-transparent border-amber-400 rounded focus:ring-amber-400 focus:ring-2"
+                      />
+                      <label htmlFor="transferCNFT" className="text-white text-sm leading-relaxed">
+                        <span className="font-semibold">Also transfer the associated cNFT</span>
+                        <br />
+                        <span className="text-gray-300 text-xs">
+                          This will transfer both the capsule ownership and the compressed NFT to the recipient
+                        </span>
+                      </label>
+                    </div>
                   )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowTransferDialog(null);
-                    setTransferAddress('');
-                  }}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
+
+                  {/* CNFT-only transfer info */}
+                  {dialogTransferType === 'cnft-only' && (
+                    <div className="p-4 bg-purple-500/10 rounded-xl border border-purple-400/20">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
+                        <span className="text-purple-300 font-semibold text-sm">CNFT Transfer Only</span>
+                      </div>
+                      <p className="text-gray-300 text-sm">
+                        You can transfer the compressed NFT associated with this capsule to another wallet. 
+                        The capsule ownership will remain unchanged.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-4 pt-4">
+                    <Button
+                      onClick={() => {
+                        if (capsule) handleTransferNFT(capsule);
+                      }}
+                      className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 py-3 rounded-xl font-semibold"
+                      disabled={!transferAddress.trim() || transferring === showTransferDialog}
+                    >
+                      {transferring === showTransferDialog ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Transferring...
+                        </>
+                      ) : (
+                        <>
+                          <ArrowRightLeft className="mr-2 h-4 w-4" />
+                          {dialogTransferType === 'both' ? 'Transfer Capsule & cNFT' : 
+                           dialogTransferType === 'cnft-only' ? 'Transfer cNFT' : 'Transfer Capsule'}
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowTransferDialog(null);
+                        setTransferAddress('');
+                        setTransferCNFT(false);
+                      }}
+                      className="flex-1 bg-white/5 hover:bg-amber-400/10 border-amber-400/30 hover:border-amber-400/60 text-white hover:text-amber-100 transition-all duration-300 py-3 rounded-xl font-semibold"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* NFT Viewer Dialog */}
       {showNFTViewer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-lg w-full">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Eye className="h-5 w-5 text-green-600" />
-                View cNFT Details
-              </CardTitle>
-              <CardDescription>
-                Compressed NFT information and verification
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-gradient-to-br from-slate-900/95 via-black/90 to-slate-800/95 rounded-3xl shadow-2xl max-w-7xl w-full border border-slate-600/30 backdrop-blur-xl overflow-hidden">
+            <div className="p-8">
+              {/* Header */}
+              <div className="text-center mb-10">
+                <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-emerald-400 via-green-500 to-teal-600 rounded-3xl mb-6 shadow-2xl shadow-emerald-400/20">
+                  <Eye className="h-12 w-12 text-white" />
+                </div>
+                <h2 className="text-4xl font-black text-white mb-3 bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent">
+                  View cNFT Details
+                </h2>
+                <p className="text-xl text-gray-400 leading-relaxed">
+                  Compressed NFT information and verification
+                </p>
+              </div>
+
               {(() => {
                 const capsule = userCapsules.find(c => c.id === showNFTViewer);
                 if (!capsule) return null;
 
                 return (
-                  <>
-                    <div className="text-center">
-                      <img 
-                        src={capsule.imageUrl} 
-                        alt={capsule.name}
-                        className="w-32 h-32 object-cover rounded-lg mx-auto mb-4"
-                      />
-                      <h3 className="font-semibold text-lg">{capsule.name}</h3>
-                      <p className="text-sm text-gray-600">{capsule.description}</p>
-                    </div>
+                  <div className="space-y-8">
+                    {/* Main NFT Display */}
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                      {/* NFT Image and Basic Info */}
+                      <div className="xl:col-span-1">
+                        <div className="bg-gradient-to-br from-slate-800/50 via-slate-700/30 to-slate-600/20 rounded-3xl p-8 border border-slate-600/30 shadow-xl h-full flex flex-col justify-center">
+                          <div className="text-center">
+                            <div className="relative mb-6">
+                              <div className="absolute inset-0 bg-gradient-to-br from-amber-400/20 via-orange-500/20 to-red-500/20 rounded-3xl blur-xl"></div>
+                              <img 
+                                src={capsule.imageUrl} 
+                                alt={capsule.name}
+                                className="relative w-40 h-40 object-cover rounded-3xl mx-auto shadow-2xl border-2 border-white/10"
+                              />
+                              {/* cNFT Status Badge */}
+                              {hasAssociatedCNFT(capsule) && (
+                                <div className="absolute -top-2 -right-2 bg-gradient-to-r from-purple-500 to-violet-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg border-2 border-white/20">
+                                  cNFT
+                                </div>
+                              )}
+                            </div>
+                            <h3 className="font-black text-3xl text-white mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                              {capsule.name}
+                            </h3>
+                            <p className="text-lg text-gray-300 leading-relaxed px-4">
+                              {capsule.description}
+                            </p>
+                            {/* cNFT Info */}
+                            {hasAssociatedCNFT(capsule) && (
+                              <div className="mt-4 p-3 bg-purple-500/10 rounded-2xl border border-purple-400/20">
+                                <div className="text-sm text-purple-200 font-medium">
+                                  Compressed NFT Available
+                                </div>
+                                <div className="text-xs text-purple-300 mt-1">
+                                  Asset ID: {capsule.metadata?.assetId?.slice(0, 8)}...
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
 
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Type:</span>
-                        <span className="font-medium">Compressed NFT</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Status:</span>
-                        <span className="font-medium text-green-600">✅ Minted</span>
-                      </div>
-                      {capsule.metadata?.mintSignature && (
-                        <div className="space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Transaction:</span>
-                            <div className="flex gap-2">
-                              <a 
-                                href={`https://solscan.io/tx/${convertSignatureToBase58(capsule.metadata.mintSignature)}?cluster=devnet`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-medium text-blue-600 hover:underline flex items-center gap-1 text-xs"
-                              >
-                                Solscan <ExternalLink className="h-3 w-3" />
-                              </a>
-                              <a 
-                                href={`https://explorer.solana.com/tx/${convertSignatureToBase58(capsule.metadata.mintSignature)}?cluster=devnet`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="font-medium text-green-600 hover:underline flex items-center gap-1 text-xs"
-                              >
-                                Explorer <ExternalLink className="h-3 w-3" />
-                              </a>
+                      {/* NFT Details Grid */}
+                      <div className="xl:col-span-2">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* Type and Status */}
+                          <div className="group bg-gradient-to-br from-blue-600/10 via-blue-500/5 to-indigo-600/10 rounded-3xl p-6 border border-blue-500/20 shadow-lg hover:shadow-blue-500/10 transition-all duration-500 hover:scale-[1.02]">
+                            <div className="flex items-center space-x-3 mb-4">
+                              <div className="w-4 h-4 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full shadow-lg shadow-blue-400/30"></div>
+                              <span className="text-blue-200 font-bold text-lg">Type & Status</span>
+                            </div>
+                            <div className="space-y-4">
+                              <div className="flex justify-between items-center p-3 bg-blue-500/10 rounded-2xl border border-blue-400/20">
+                                <span className="text-blue-100 font-medium">Type:</span>
+                                <span className="font-bold text-white text-lg">Compressed NFT</span>
+                              </div>
+                              <div className="flex justify-between items-center p-3 bg-emerald-500/10 rounded-2xl border border-emerald-400/20">
+                                <span className="text-emerald-100 font-medium">Status:</span>
+                                <span className="flex items-center space-x-2">
+                                  <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
+                                  <span className="font-bold text-emerald-300 text-lg">✅ Minted</span>
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <div className="bg-gray-800 border border-gray-700 p-2 rounded text-xs font-mono break-all text-gray-300">
-                            {convertSignatureToBase58(capsule.metadata.mintSignature)}
+
+                          {/* Transaction Info */}
+                          <div className="group bg-gradient-to-br from-purple-600/10 via-purple-500/5 to-violet-600/10 rounded-3xl p-6 border border-purple-500/20 shadow-lg hover:shadow-purple-500/10 transition-all duration-500 hover:scale-[1.02]">
+                            <div className="flex items-center space-x-3 mb-4">
+                              <div className="w-4 h-4 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full shadow-lg shadow-purple-400/30"></div>
+                              <span className="text-purple-200 font-bold text-lg">Transaction</span>
+                            </div>
+                            {capsule.metadata?.mintSignature && (
+                              <div className="space-y-4">
+                                <div className="p-3 bg-slate-800/50 rounded-2xl border border-slate-600/30">
+                                  <div className="text-xs text-gray-400 font-mono break-all leading-relaxed">
+                                    {convertSignatureToBase58(capsule.metadata.mintSignature)}
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <a 
+                                    href={`https://solscan.io/tx/${convertSignatureToBase58(capsule.metadata.mintSignature)}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="bg-gradient-to-r from-purple-500/20 to-purple-600/20 hover:from-purple-500/30 hover:to-purple-600/30 text-purple-200 hover:text-purple-100 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-300 flex items-center justify-center space-x-2 border border-purple-400/30 hover:border-purple-400/50 group-hover:shadow-purple-500/20"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                    Solscan
+                                  </a>
+                                  <a 
+                                    href={`https://explorer.solana.com/tx/${convertSignatureToBase58(capsule.metadata.mintSignature)}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="bg-gradient-to-r from-violet-500/20 to-violet-600/20 hover:from-violet-500/30 hover:to-violet-600/30 text-violet-200 hover:text-violet-100 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-300 flex items-center justify-center space-x-2 border border-violet-400/30 hover:border-violet-400/50 group-hover:shadow-violet-500/20"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                    Explorer
+                                  </a>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
-                      
-                      {/* Transaction verification info */}
-                      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                        <h4 className="text-sm font-semibold text-blue-800 mb-2">Verification Guide</h4>
-                        <p className="text-xs text-blue-700 mb-2">
-                          To verify this cNFT on blockchain explorers, use the transaction signature above.
-                        </p>
-                        <div className="text-xs text-blue-600">
-                          • <strong>Transaction:</strong> Shows the mint transaction details<br/>
-                          • <strong>Tree Address:</strong> Shows the Merkle tree containing your cNFT<br/>
-                          • cNFTs are stored in compressed format in Merkle trees, not as individual accounts
-                        </div>
-                      </div>
-                      
-                      {/* Merkle Tree Address */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Tree Address:</span>
-                          <button
-                            onClick={() => {
-                              const treeAddress = process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS || '2HrpJ9aJ55syANL4YfknaDDsnTX7GiGCU8Rq9FpABJ9j';
-                              navigator.clipboard.writeText(treeAddress);
-                              toast.success('Tree address copied to clipboard!');
-                            }}
-                            className="text-blue-600 hover:underline text-xs"
-                            title="Click to copy Merkle Tree Address"
-                          >
-                            Copy Address
-                          </button>
-                        </div>
-                        <div className="bg-gray-800 border border-gray-700 p-2 rounded text-xs font-mono break-all text-gray-300">
-                          {process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS || '2HrpJ9aJ55syANL4YfknaDDsnTX7GiGCU8Rq9FpABJ9j'}
+
+                          {/* Merkle Tree Info */}
+                          <div className="group bg-gradient-to-br from-amber-600/10 via-orange-500/5 to-red-600/10 rounded-3xl p-6 border border-amber-500/20 shadow-lg hover:shadow-amber-500/10 transition-all duration-500 hover:scale-[1.02]">
+                            <div className="flex items-center space-x-3 mb-4">
+                              <div className="w-4 h-4 bg-gradient-to-br from-amber-400 to-orange-600 rounded-full shadow-lg shadow-amber-400/30"></div>
+                              <span className="text-amber-200 font-bold text-lg">Merkle Tree</span>
+                            </div>
+                            <div className="space-y-4">
+                              <div className="p-3 bg-slate-800/50 rounded-2xl border border-slate-600/30">
+                                <div className="text-xs text-gray-400 font-mono break-all leading-relaxed">
+                                  {capsule.metadata?.treeAddress || 
+                                   process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS || 
+                                   'Tree address not available'}
+                                </div>
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  const treeAddress = capsule.metadata?.treeAddress || 
+                                                    process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS;
+                                  if (treeAddress) {
+                                    navigator.clipboard.writeText(treeAddress);
+                                    toast.success('Tree address copied to clipboard!');
+                                  } else {
+                                    toast.error('No tree address available to copy');
+                                  }
+                                }}
+                                disabled={!capsule.metadata?.treeAddress && !process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS}
+                                className="w-full bg-gradient-to-r from-amber-500/20 to-orange-600/20 hover:from-amber-500/30 hover:to-orange-600/30 text-amber-200 hover:text-amber-100 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed border border-amber-400/30 hover:border-amber-400/50 group-hover:shadow-amber-500/20"
+                              >
+                                Copy Tree Address
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Verification Guide */}
+                          <div className="group bg-gradient-to-br from-emerald-600/10 via-green-500/5 to-teal-600/10 rounded-3xl p-6 border border-emerald-500/20 shadow-lg hover:shadow-emerald-500/10 transition-all duration-500 hover:scale-[1.02]">
+                            <div className="flex items-center space-x-3 mb-4">
+                              <div className="w-4 h-4 bg-gradient-to-br from-emerald-400 to-green-600 rounded-full shadow-lg shadow-emerald-400/30"></div>
+                              <span className="text-emerald-200 font-bold text-lg">Verification</span>
+                            </div>
+                            <div className="space-y-3">
+                              <div className="flex items-start space-x-3 p-3 bg-emerald-500/10 rounded-2xl border border-emerald-400/20">
+                                <div className="w-2 h-2 bg-emerald-400 rounded-full mt-2 flex-shrink-0 shadow-lg shadow-emerald-400/50"></div>
+                                <span className="text-sm text-emerald-100 leading-relaxed">Use transaction signature to verify on blockchain explorers</span>
+                              </div>
+                              <div className="flex items-start space-x-3 p-3 bg-emerald-500/10 rounded-2xl border border-emerald-400/20">
+                                <div className="w-2 h-2 bg-emerald-400 rounded-full mt-2 flex-shrink-0 shadow-lg shadow-emerald-400/50"></div>
+                                <span className="text-sm text-emerald-100 leading-relaxed">Merkle tree contains your compressed NFT data</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
-                      {capsule.metadata?.mintSignature && (
-                        <Button
-                          variant="outline"
-                          onClick={() => window.open(`https://solscan.io/tx/${convertSignatureToBase58(capsule.metadata!.mintSignature)}?cluster=devnet`, '_blank')}
-                          className="flex-1"
-                          size="sm"
-                        >
-                          <ExternalLink className="mr-1 h-3 w-3" />
-                          Solscan
-                        </Button>
-                      )}
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-4 pt-8">
                       <Button
-                        variant="outline"
                         onClick={() => {
-                          const treeAddress = process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS || '2HrpJ9aJ55syANL4YfknaDDsnTX7GiGCU8Rq9FpABJ9j';
-                          const solscanUrl = `https://solscan.io/account/${treeAddress}?cluster=devnet`;
-                          window.open(solscanUrl, '_blank');
+                          const treeAddress = capsule.metadata?.treeAddress || 
+                                            process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS;
+                          if (treeAddress) {
+                            window.open(`https://solscan.io/account/${treeAddress}?cluster=devnet`, '_blank');
+                          } else {
+                            toast.error('No tree address available to view');
+                          }
                         }}
-                        className="flex-1"
-                        size="sm"
+                        disabled={!capsule.metadata?.treeAddress && !process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS}
+                        className="flex-1 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 hover:from-blue-600 hover:via-blue-700 hover:to-blue-800 text-white border-0 shadow-xl hover:shadow-2xl hover:shadow-blue-500/25 transition-all duration-300 py-4 rounded-2xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
                       >
-                        <ExternalLink className="mr-1 h-3 w-3" />
-                        View Tree
+                        <ExternalLink className="mr-3 h-5 w-5" />
+                        View on Solscan
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          const treeAddress = capsule.metadata?.treeAddress || 
+                                            process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS;
+                          if (treeAddress) {
+                            window.open(`https://explorer.solana.com/address/${treeAddress}?cluster=devnet`, '_blank');
+                          } else {
+                            toast.error('No tree address available to view');
+                          }
+                        }}
+                        disabled={!capsule.metadata?.treeAddress && !process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS}
+                        className="flex-1 bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 hover:from-purple-600 hover:via-purple-700 hover:to-purple-800 text-white border-0 shadow-xl hover:shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 py-4 rounded-2xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02]"
+                      >
+                        <ExternalLink className="mr-3 h-5 w-5" />
+                        View on Explorer
                       </Button>
                       <Button
                         variant="outline"
                         onClick={() => setShowNFTViewer(null)}
-                        className="flex-1"
-                        size="sm"
+                        className="flex-1 bg-gradient-to-r from-slate-600/20 to-slate-700/20 hover:from-slate-600/30 hover:to-slate-700/30 border-slate-500/30 hover:border-slate-400/50 text-slate-200 hover:text-white transition-all duration-300 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transform hover:scale-[1.02]"
                       >
                         Close
                       </Button>
                     </div>
-                  </>
+                  </div>
                 );
               })()}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Image Modal */}
+      {showFullscreenImage && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setShowFullscreenImage(null)}>
+          <div className="relative max-w-5xl max-h-full">
+            <img
+              src={showFullscreenImage}
+              alt="Fullscreen view"
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFullscreenImage(null);
+              }}
+              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 border-white/30 text-white hover:border-white/60 transition-all duration-300"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 
       {/* Toast Container */}
-      <Toaster 
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,

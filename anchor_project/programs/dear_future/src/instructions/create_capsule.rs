@@ -30,11 +30,9 @@ pub fn handler(
     title: String,
     content: String,
     unlock_date: i64,
+    encrypted_url: Option<String>,
 ) -> Result<()> {
-    let config = &mut ctx.accounts.config;
-    let capsule = &mut ctx.accounts.capsule;
-    let clock = Clock::get()?;
-    
+    // Validate inputs first to fail fast
     require!(
         title.len() <= MAX_TITLE_LENGTH,
         ErrorCode::TitleTooLong
@@ -45,29 +43,43 @@ pub fn handler(
         ErrorCode::ContentTooLong
     );
     
+    if let Some(ref url) = encrypted_url {
+        require!(
+            url.len() <= MAX_URL_LENGTH,
+            ErrorCode::UrlTooLong
+        );
+    }
+    
+    let clock = Clock::get()?;
     require!(
         unlock_date > clock.unix_timestamp,
         ErrorCode::UnlockDateMustBeFuture
     );
     
+    // Initialize capsule directly without intermediate variables
+    let capsule = &mut ctx.accounts.capsule;
     capsule.creator = ctx.accounts.creator.key();
-    capsule.id = config.total_capsules;
-    capsule.title = title.clone();
+    capsule.owner = ctx.accounts.creator.key(); // Initially, creator is the owner
+    capsule.id = ctx.accounts.config.total_capsules;
+    capsule.title = title;
     capsule.content = content;
+    capsule.encrypted_url = encrypted_url;
     capsule.unlock_date = unlock_date;
     capsule.is_unlocked = false;
     capsule.mint = None;
+    capsule.mint_creator = None;
+    capsule.transferred_at = None;
     capsule.created_at = clock.unix_timestamp;
     capsule.updated_at = clock.unix_timestamp;
     capsule.bump = ctx.bumps.capsule;
     
     // Update global counter
-    config.total_capsules = config.total_capsules.checked_add(1).unwrap();
+    ctx.accounts.config.total_capsules = ctx.accounts.config.total_capsules.checked_add(1).unwrap();
     
     emit!(CapsuleCreated {
         capsule: capsule.key(),
         creator: ctx.accounts.creator.key(),
-        title,
+        title: capsule.title.clone(),
         unlock_date,
         timestamp: clock.unix_timestamp,
     });

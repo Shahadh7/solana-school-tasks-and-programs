@@ -1,5 +1,5 @@
 {
-  "address": "5BY4zzPL5qWSwDeArRD82YpSY1utsJGBsgNisTPpuHTm",
+  "address": "4UHykQD4g6ANrhZXYnKtECq9dq4HxV3JbFCkkRE4krX5",
   "metadata": {
     "name": "dear_future",
     "version": "0.1.0",
@@ -39,7 +39,8 @@
               },
               {
                 "kind": "account",
-                "path": "creator"
+                "path": "capsule.creator",
+                "account": "Capsule"
               },
               {
                 "kind": "account",
@@ -50,7 +51,7 @@
           }
         },
         {
-          "name": "creator",
+          "name": "owner",
           "writable": true,
           "signer": true
         }
@@ -194,6 +195,71 @@
       "args": []
     },
     {
+      "name": "transfer_capsule",
+      "discriminator": [
+        46,
+        51,
+        200,
+        59,
+        191,
+        212,
+        25,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "capsule.creator",
+                "account": "Capsule"
+              },
+              {
+                "kind": "account",
+                "path": "capsule.id",
+                "account": "Capsule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "current_owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "new_owner"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "mint_address",
+          "type": {
+            "option": "pubkey"
+          }
+        }
+      ]
+    },
+    {
       "name": "unlock_capsule",
       "discriminator": [
         252,
@@ -237,7 +303,7 @@
           }
         },
         {
-          "name": "unlocker",
+          "name": "owner",
           "signer": true
         }
       ],
@@ -275,7 +341,8 @@
               },
               {
                 "kind": "account",
-                "path": "creator"
+                "path": "capsule.creator",
+                "account": "Capsule"
               },
               {
                 "kind": "account",
@@ -286,7 +353,7 @@
           }
         },
         {
-          "name": "creator",
+          "name": "owner",
           "writable": true,
           "signer": true
         }
@@ -373,6 +440,19 @@
       ]
     },
     {
+      "name": "CapsuleTransferred",
+      "discriminator": [
+        146,
+        238,
+        110,
+        182,
+        145,
+        13,
+        94,
+        50
+      ]
+    },
+    {
       "name": "CapsuleUnlocked",
       "discriminator": [
         225,
@@ -454,6 +534,16 @@
       "code": 6010,
       "name": "UnauthorizedAccess",
       "msg": "Only the capsule creator can perform this action"
+    },
+    {
+      "code": 6011,
+      "name": "NotOwner",
+      "msg": "Only the capsule owner can perform this action"
+    },
+    {
+      "code": 6012,
+      "name": "CannotTransferToSelf",
+      "msg": "Cannot transfer capsule to the same owner"
     }
   ],
   "types": [
@@ -464,6 +554,10 @@
         "fields": [
           {
             "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
             "type": "pubkey"
           },
           {
@@ -483,7 +577,19 @@
             "type": "i64"
           },
           {
+            "name": "transferred_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
             "name": "mint",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "mint_creator",
             "type": {
               "option": "pubkey"
             }
@@ -553,6 +659,36 @@
           {
             "name": "unlock_date",
             "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CapsuleTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "capsule",
+            "type": "pubkey"
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": {
+              "option": "pubkey"
+            }
           },
           {
             "name": "timestamp",

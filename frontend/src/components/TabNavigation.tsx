@@ -17,6 +17,14 @@ export function TabNavigation() {
     }
   };
 
+  const handleCapsuleCreated = () => {
+    // Trigger refresh and switch to My Capsules tab after creation
+    setRefreshTrigger(prev => prev + 1);
+    setTimeout(() => {
+      setActiveTab('my-capsules');
+    }, 2000); // Wait 2 seconds to let success message show, then switch tabs
+  };
+
   return (
     <div className="container mx-auto px-3 md:px-4 md:py-6 lg:py-8">
       <div className="max-w-7xl mx-auto">
@@ -49,7 +57,7 @@ export function TabNavigation() {
         </div>
 
         {/* Content */}
-        {activeTab === 'create' && <CapsuleMinter onCapsuleCreated={() => setRefreshTrigger(prev => prev + 1)} />}
+        {activeTab === 'create' && <CapsuleMinter onCapsuleCreated={handleCapsuleCreated} />}
         {activeTab === 'my-capsules' && <MyCapsules key={refreshTrigger} />}
       </div>
     </div>

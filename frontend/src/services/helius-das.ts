@@ -290,7 +290,7 @@ class HeliusDasService {
               })
             } else {
               // Transaction confirmed - try to extract asset ID
-              const logs = (result?.meta as any)?.logMessages || []
+              const logs = (result?.meta as Record<string, unknown>)?.logMessages || []
               let assetId: string | undefined
 
               // Look for asset ID in logs (this is a simplified extraction)
@@ -350,7 +350,7 @@ class HeliusDasService {
 
   /**
    * Get proof for compressed NFT transfer
-   * Note: This would require additional Helius API endpoints for merkle proofs
+   * This method fetches merkle proofs from Helius DAS API
    */
   async getAssetProof(assetId: string): Promise<{
     root: string
@@ -360,15 +360,22 @@ class HeliusDasService {
     tree_id: string
   } | null> {
     try {
-      console.log('Fetching proof for asset:', assetId)
+      console.log('Fetching proof for asset:', assetId);
       
-      // This would be implemented with Helius proof API
-      // For now, return null to indicate proof fetching is not implemented
-      console.warn('Asset proof fetching not yet implemented')
-      return null
+      // Use Helius DAS API to get asset proof
+      const response = await this.makeRequest<{
+        root: string
+        proof: string[]
+        node_index: number
+        leaf: string
+        tree_id: string
+      }>(`/assets/${assetId}/proof`);
+      
+      console.log('Asset proof fetched successfully:', response);
+      return response;
     } catch (error) {
-      console.error('Failed to fetch asset proof:', error)
-      return null
+      console.error('Failed to fetch asset proof:', error);
+      return null;
     }
   }
 

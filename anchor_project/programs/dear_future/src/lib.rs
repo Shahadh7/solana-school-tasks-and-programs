@@ -8,7 +8,7 @@ pub mod state;
 pub mod errors;
 pub mod events;
 
-declare_id!("5BY4zzPL5qWSwDeArRD82YpSY1utsJGBsgNisTPpuHTm");
+declare_id!("4UHykQD4g6ANrhZXYnKtECq9dq4HxV3JbFCkkRE4krX5");
 
 #[program]
 pub mod dear_future {
@@ -25,17 +25,20 @@ pub mod dear_future {
         title: String,
         content: String,
         unlock_date: i64,
+        encrypted_url: Option<String>,
     ) -> Result<()> {
-        instructions::create_capsule::handler(ctx, title, content, unlock_date)
+        instructions::create_capsule::handler(ctx, title, content, unlock_date, encrypted_url)
     }
 
-    // Unlock a memory capsule
+    // Update a memory capsule
     pub fn update_capsule(
         ctx: Context<UpdateCapsule>,
         new_content: Option<String>,
         new_unlock_date: Option<i64>,
+        new_encrypted_url: Option<String>,
+        remove_encrypted_url: bool,
     ) -> Result<()> {
-        instructions::update_capsule::handler(ctx, new_content, new_unlock_date)
+        instructions::update_capsule::handler(ctx, new_content, new_unlock_date, new_encrypted_url, remove_encrypted_url)
     }
 
     // Unlock a memory capsule
@@ -52,4 +55,11 @@ pub mod dear_future {
         instructions::close_capsule::handler(ctx)
     }
 
+    // Transfer a memory capsule to a new owner
+    pub fn transfer_capsule(
+        ctx: Context<TransferCapsule>,
+        mint_address: Option<Pubkey>,
+    ) -> Result<()> {
+        instructions::transfer_capsule::handler(ctx, mint_address)
+    }
 }

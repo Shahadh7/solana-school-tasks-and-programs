@@ -5,15 +5,15 @@ use crate::{state::Capsule, errors::ErrorCode, events::CapsuleClosed};
 pub struct CloseCapsule<'info> {
     #[account(
         mut,
-        seeds = [Capsule::SEED, creator.key().as_ref(), &capsule.id.to_le_bytes()],
+        seeds = [Capsule::SEED, capsule.creator.as_ref(), &capsule.id.to_le_bytes()],
         bump = capsule.bump,
-        constraint = capsule.creator == creator.key() @ ErrorCode::UnauthorizedAccess,
-        close = creator,
+        constraint = capsule.owner == owner.key() @ ErrorCode::NotOwner,
+        close = owner,
     )]
     pub capsule: Account<'info, Capsule>,
     
     #[account(mut)]
-    pub creator: Signer<'info>,
+    pub owner: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<CloseCapsule>) -> Result<()> {
@@ -24,7 +24,7 @@ pub fn handler(ctx: Context<CloseCapsule>) -> Result<()> {
     
     emit!(CapsuleClosed {
         capsule: capsule.key(),
-        closer: ctx.accounts.creator.key(),
+        closer: ctx.accounts.owner.key(),
         timestamp: clock.unix_timestamp,
     });
     

@@ -27,6 +27,8 @@ import bs58 from 'bs58'
 // Import DAS API types from Helius service
 import { heliusDasService, DasApiAsset, MintTransactionStatus } from './helius-das'
 import { PublicKey } from '@solana/web3.js'
+// Import transfer instruction
+const { transfer } = await import('@metaplex-foundation/mpl-bubblegum/dist/src/generated/instructions/transfer');
 
 // Types for the service
 export interface CNFTMetadata {
@@ -104,8 +106,15 @@ class CNFTService {
    */
   async initialize(wallet: Wallet): Promise<void> {
     try {
-      // Set up wallet adapter identity
-      this.umi.use(walletAdapterIdentity(wallet))
+      // Set up wallet adapter identity with proper type handling
+      const walletAdapter = walletAdapterIdentity({
+        publicKey: wallet.publicKey,
+        signTransaction: wallet.signTransaction,
+        signMessage: wallet.signMessage,
+        signAllTransactions: wallet.signAllTransactions,
+      });
+      
+      this.umi.use(walletAdapter);
 
     } catch (error) {
       throw new Error(`CNFTService initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -339,34 +348,95 @@ class CNFTService {
 
   /**
    * Transfer a compressed NFT to another owner
-   * Note: This is a placeholder implementation. In production, you would need:
-   * - The current merkle root
-   * - Data hash of the leaf
-   * - Creator hash
-   * - Nonce and leaf index
-   * - Merkle proof path
+   * This implementation fetches asset data and merkle proofs from DAS API
    */
   async transferCNFT(params: {
     assetId: string
-    newOwner: UmiPublicKey
-    merkleTree: UmiPublicKey
-    leafIndex: number
+    newOwner: string | UmiPublicKey
+    merkleTree?: UmiPublicKey
+    leafIndex?: number
     proof?: UmiPublicKey[]
   }): Promise<string> {
     try {
+      // Convert newOwner to UMI public key if it's a string
+      const newOwnerKey = typeof params.newOwner === 'string' 
+        ? createPublicKey(params.newOwner)
+        : params.newOwner;
 
-  
-      // This requires fetching the asset data and merkle proof from DAS API
-      throw new Error('cNFT transfer not yet implemented. Requires DAS API integration for merkle proofs.')
+      console.log('Starting cNFT transfer:', {
+        assetId: params.assetId,
+        newOwner: newOwnerKey.toString(),
+        merkleTree: params.merkleTree?.toString(),
+        leafIndex: params.leafIndex
+      });
+
+      // Fetch asset data from DAS API
+      const asset = await heliusDasService.getAsset(params.assetId);
+      if (!asset) {
+        throw new Error('Asset not found in DAS API');
+      }
+
+      // Validate asset is compressed
+      if (!asset.compression?.compressed) {
+        throw new Error('Asset is not a compressed NFT');
+      }
+
+      // Get merkle tree address from asset data
+      const merkleTree = params.merkleTree || createPublicKey(asset.compression.tree);
+      const leafIndex = params.leafIndex || asset.compression.leaf_id;
+
+      // Fetch merkle proof from DAS API
+      const proofData = await heliusDasService.getAssetProof(params.assetId);
+      if (!proofData) {
+        throw new Error('Failed to fetch merkle proof for asset transfer');
+      }
+
+      // Convert proof strings to UMI public keys
+      const proof = proofData.proof.map(p => createPublicKey(p));
+
       
-      // In a full implementation, you would:
-      // 1. Fetch the asset data using DAS API
-      // 2. Get the merkle proof for the current leaf
-      // 3. Create transfer transaction with all required parameters:
-      //    - root, dataHash, creatorHash, nonce, index, proof
-      
+
+      // Create transfer transaction
+      const transferTx = transfer(this.umi, {
+        leafOwner: this.umi.identity.publicKey,
+        newLeafOwner: newOwnerKey,
+        merkleTree,
+        root: bs58.decode(proofData.root),
+        dataHash: bs58.decode(asset.compression.data_hash),
+        creatorHash: bs58.decode(asset.compression.creator_hash),
+        nonce: asset.compression.seq,
+        index: leafIndex,
+        proof,
+      });
+
+      console.log('Sending transfer transaction...');
+
+      // Send and confirm the transaction
+      const result = await transferTx.sendAndConfirm(this.umi, {
+        send: { commitment: 'confirmed' },
+        confirm: { commitment: 'confirmed' }
+      });
+
+      // Convert signature to base58 string
+      let signature: string;
+      try {
+        if (result.signature instanceof Uint8Array) {
+          signature = bs58.encode(result.signature);
+        } else if (Array.isArray(result.signature)) {
+          signature = bs58.encode(new Uint8Array(result.signature));
+        } else {
+          signature = String(result.signature);
+        }
+      } catch (error) {
+        signature = String(result.signature);
+      }
+
+      console.log('cNFT transfer successful:', signature);
+
+      return signature;
     } catch (error) {
-      throw new Error(`cNFT transfer failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.error('cNFT transfer failed:', error);
+      throw new Error(`cNFT transfer failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

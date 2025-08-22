@@ -14,8 +14,11 @@ pub enum ErrorCode {
     #[msg("Capsule title is too long (max 100 characters)")]
     TitleTooLong,
 
-    #[msg("Capsule content is too long (max 2000 characters)")]
+    #[msg("Capsule content is too long (max 300 characters)")]
     ContentTooLong,
+
+    #[msg("Encrypted URL is too long (max 500 characters)")]
+    UrlTooLong,
 
     #[msg("New unlock date must be later than current unlock date (extend only)")]
     InvalidUnlockDateExtension,
@@ -31,4 +34,10 @@ pub enum ErrorCode {
 
     #[msg("Only the capsule creator can perform this action")]
     UnauthorizedAccess,
+
+    #[msg("Only the capsule owner can perform this action")]
+    NotOwner,
+
+    #[msg("Cannot transfer capsule to the same owner")]
+    CannotTransferToSelf,
 }

@@ -43,7 +43,7 @@ class SolanaService {
 
   constructor() {
     this.connection = createOptimizedConnection();
-    this.programId = new PublicKey('5BY4zzPL5qWSwDeArRD82YpSY1utsJGBsgNisTPpuHTm');
+    this.programId = new PublicKey('4UHykQD4g6ANrhZXYnKtECq9dq4HxV3JbFCkkRE4krX5');
     this.provider = {} as AnchorProvider;
   }
 
@@ -110,9 +110,9 @@ class SolanaService {
     // Get current capsule count
     let capsuleId = 0;
     try {
-      const configAccount = await (program.account as any)['config'].fetch(configPda);
+      const configAccount = await (program.account as Record<string, unknown>)['config'].fetch(configPda);
       capsuleId = configAccount.totalCapsules.toNumber();
-    } catch (error) {
+    } catch {
       capsuleId = 0;
     }
     
@@ -144,7 +144,9 @@ class SolanaService {
     wallet: Wallet,
     capsuleAddress: string,
     newContent?: string,
-    newUnlockDate?: number
+    newUnlockDate?: number,
+    newEncryptedUrl?: string,
+    removeEncryptedUrl?: boolean
   ): Promise<string> {
     this.setProvider(wallet);
     const program = this.getProgram();
@@ -155,8 +157,8 @@ class SolanaService {
       .updateCapsule(
         newContent || null,
         newUnlockDate ? new BN(newUnlockDate) : null,
-        null,
-        false
+        newEncryptedUrl || null,
+        removeEncryptedUrl || false
       )
       .accounts({
         capsule: capsulePubkey,
@@ -181,7 +183,7 @@ class SolanaService {
       })
       .rpc();
 
-    const capsuleAccount = await (program.account as any)['capsule'].fetch(capsulePubkey);
+    const capsuleAccount = await (program.account as Record<string, unknown>)['capsule'].fetch(capsulePubkey);
     
     return {
       signature: tx,
@@ -216,27 +218,71 @@ class SolanaService {
     this.setProvider(wallet);
     const program = this.getProgram();
     
-    const capsulePubkey = new PublicKey(capsuleAddress);
-    const newOwnerPubkey = new PublicKey(newOwner);
-    const mintPubkey = mintAddress ? new PublicKey(mintAddress) : null;
-    
-    const tx = await program.methods
-      .transferCapsule(mintPubkey)
-      .accounts({
-        capsule: capsulePubkey,
-        currentOwner: wallet.publicKey,
-        newOwner: newOwnerPubkey,
-        systemProgram: web3.SystemProgram.programId,
-      })
-      .rpc();
+    try {
+      console.log('Transfer capsule inputs (capsule only):', {
+        capsuleAddress,
+        newOwner,
+        mintAddress: mintAddress || 'none (capsule-only transfer)',
+        currentOwner: wallet.publicKey.toString()
+      });
 
-    return {
-      signature: tx,
-      newOwner: newOwner,
-    };
+      const capsulePubkey = new PublicKey(capsuleAddress);
+      console.log('Capsule pubkey:', capsulePubkey.toString());
+      
+      const newOwnerPubkey = new PublicKey(newOwner);
+      console.log('New owner pubkey:', newOwnerPubkey.toString());
+      
+      let mintPubkey = null;
+      if (mintAddress) {
+        try {
+          mintPubkey = new PublicKey(mintAddress);
+          console.log('Mint pubkey:', mintPubkey.toString());
+        } catch (error) {
+          console.warn('Invalid mint address provided, using null instead:', mintAddress);
+          console.error('Mint address error:', error);
+          mintPubkey = null;
+        }
+      } else {
+        console.log('No mint address provided');
+      }
+      
+      const tx = await program.methods
+        .transferCapsule(mintPubkey)
+        .accounts({
+          capsule: capsulePubkey,
+          currentOwner: wallet.publicKey,
+          newOwner: newOwnerPubkey,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      console.log('Transfer transaction successful:', tx);
+
+      return {
+        signature: tx,
+        newOwner: newOwner,
+      };
+    } catch (error) {
+      console.error('Transfer capsule error:', error);
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('Invalid public key input')) {
+          throw new Error(`Invalid address format. Please check: ${newOwner}`);
+        } else if (error.message.includes('NotOwner')) {
+          throw new Error('You are not the owner of this capsule');
+        } else if (error.message.includes('CannotTransferToSelf')) {
+          throw new Error('Cannot transfer capsule to yourself');
+        } else {
+          throw new Error(`Transfer failed: ${error.message}`);
+        }
+      }
+      
+      throw error;
+    }
   }
 
-    async getWalletCapsules(wallet: Wallet): Promise<any[]> {
+    async getWalletCapsules(wallet: Wallet): Promise<Record<string, unknown>[]> {
     this.setProvider(wallet);
     const program = this.getProgram();
     
@@ -244,10 +290,10 @@ class SolanaService {
     
     try {
       // Try to use Anchor's account query first
-      const allCapsules = await (program.account as any)['capsule'].all();
+      const allCapsules = await (program.account as Record<string, unknown>)['capsule'].all();
 
       
-      const userCapsules = allCapsules.filter((capsule: any) => 
+      const userCapsules = allCapsules.filter((capsule: Record<string, unknown>) => 
         capsule.account.creator.toString() === wallet.publicKey.toString() ||
         capsule.account.owner.toString() === wallet.publicKey.toString()
       );
@@ -255,16 +301,16 @@ class SolanaService {
 
       
       // Transform to the expected format
-      const capsules = userCapsules.map((capsule: any) => ({
+      const capsules = userCapsules.map((capsule: Record<string, unknown>) => ({
         address: capsule.publicKey.toString(),
         ...capsule.account,
       }));
       
       // Sort capsules by creation date (newest first)
-      capsules.sort((a: any, b: any) => b.createdAt.toNumber() - a.createdAt.toNumber());
+      capsules.sort((a: Record<string, unknown>, b: Record<string, unknown>) => b.createdAt.toNumber() - a.createdAt.toNumber());
       
       return capsules;
-    } catch (error) {
+    } catch {
       
       // Fallback to RPC method
       const accounts = await this.connection.getProgramAccounts(this.programId);
@@ -273,7 +319,7 @@ class SolanaService {
       const capsules = [];
       for (const account of accounts) {
         try {
-          const capsuleData = await (program.account as any)['capsule'].fetch(account.pubkey);
+          const capsuleData = await (program.account as Record<string, unknown>)['capsule'].fetch(account.pubkey);
 
           
           // Include capsules created by or owned by the current wallet
@@ -285,7 +331,7 @@ class SolanaService {
             });
 
           }
-        } catch (error) {
+        } catch {
           // Skip accounts that aren't capsule accounts
           continue;
         }
@@ -294,7 +340,7 @@ class SolanaService {
 
 
       // Sort capsules by creation date (newest first)
-      capsules.sort((a: any, b: any) => b.createdAt.toNumber() - a.createdAt.toNumber());
+      capsules.sort((a: Record<string, unknown>, b: Record<string, unknown>) => b.createdAt.toNumber() - a.createdAt.toNumber());
 
       return capsules;
     }
@@ -327,7 +373,7 @@ class SolanaService {
   async getCurrentSlot(): Promise<number> {
     try {
       return await this.connection.getSlot();
-    } catch (error) {
+    } catch {
       return 0;
     }
   }
@@ -336,7 +382,7 @@ class SolanaService {
     try {
       const balance = await this.connection.getBalance(walletAddress);
       return balance / LAMPORTS_PER_SOL;
-    } catch (error) {
+    } catch {
       return 0;
     }
   }

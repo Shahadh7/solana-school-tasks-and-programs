@@ -15,6 +15,7 @@ pub struct CapsuleUpdated {
     pub updater: Pubkey,
     pub new_unlock_date: Option<i64>,
     pub content_updated: bool,
+    pub url_updated: bool,
     pub timestamp: i64,
 }
 
@@ -33,11 +34,10 @@ pub struct CapsuleClosed {
 }
 
 #[event]
-pub struct CapsuleNftMinted {
+pub struct CapsuleTransferred {
     pub capsule: Pubkey,
-    pub mint: Pubkey,
-    pub creator: Pubkey,
-    pub name: String,
-    pub symbol: String,
+    pub from: Pubkey,
+    pub to: Pubkey,
+    pub mint: Option<Pubkey>,
     pub timestamp: i64,
 }

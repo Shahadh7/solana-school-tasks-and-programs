@@ -23,6 +23,7 @@ export interface Capsule {
     creator?: string
     transferredAt?: number
     mintCreator?: string
+    treeAddress?: string
   }
 }
 

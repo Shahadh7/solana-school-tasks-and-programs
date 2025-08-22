@@ -6,6 +6,7 @@ import { useDropzone } from 'react-dropzone';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Upload, Calendar, Loader2, CheckCircle, AlertCircle, Lock } from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
 import { useAppStore } from '@/stores/appStore';
 // import { format } from 'date-fns'; // Unused import
 import { WebSocketStatus } from '@/components/WebSocketStatus';
@@ -172,6 +173,16 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
         }
       });
 
+      // Show success toast
+      toast.success('🎉 Memory capsule created successfully! Switching to My Capsules...', {
+        duration: 4000,
+      });
+
+      // Reset minting state after successful creation
+      setTimeout(() => {
+        resetMinting();
+      }, 2000); // Keep success message visible for 2 seconds
+
       // Notify parent component that capsule was created
       if (onCapsuleCreated) {
         onCapsuleCreated();
@@ -182,10 +193,17 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
 
     } catch (error) {
       console.error('Error creating capsule:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      // Show error toast
+      toast.error(`❌ Failed to create capsule: ${errorMessage}`, {
+        duration: 5000,
+      });
+      
       setMintingState({ 
         status: 'error', 
         progress: 0, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+        error: errorMessage
       });
     }
   };
