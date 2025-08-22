@@ -17,12 +17,18 @@ export interface Capsule {
       trait_type: string
       value: string
     }>
+    nftMinted?: boolean
+    mintSignature?: string
+    assetId?: string
+    creator?: string
+    transferredAt?: number
+    mintCreator?: string
   }
 }
 
 export interface MintingState {
   isLoading: boolean
-  status: 'idle' | 'uploading' | 'minting' | 'success' | 'error'
+  status: 'idle' | 'uploading' | 'encrypting' | 'minting' | 'success' | 'error'
   progress: number
   error?: string
   transaction?: string

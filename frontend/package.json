@@ -6,16 +6,19 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "create-tree": "npx ts-node scripts/create-merkle-tree.ts",
+    "generate-keypair": "npx ts-node scripts/generate-keypair.ts"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
     "@metaplex-foundation/digital-asset-standard-api": "^2.0.0",
     "@metaplex-foundation/mpl-bubblegum": "^5.0.2",
     "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
-    "@metaplex-foundation/umi": "^0.8.10",
-    "@metaplex-foundation/umi-bundle-defaults": "^0.8.10",
+    "@metaplex-foundation/umi": "^1.2.0",
+    "@metaplex-foundation/umi-bundle-defaults": "^1.2.0",
     "@metaplex-foundation/umi-signer-wallet-adapters": "^1.2.0",
-    "@metaplex-foundation/umi-web3js-adapters": "^0.8.10",
+    "@metaplex-foundation/umi-web3js-adapters": "^1.2.0",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-dropdown-menu": "^2.1.2",
     "@radix-ui/react-progress": "^1.1.0",
@@ -30,6 +33,7 @@
     "@solana/wallet-adapter-wallets": "^0.19.37",
     "@solana/web3.js": "^1.95.2",
     "@tailwindcss/line-clamp": "^0.4.4",
+    "bs58": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -39,6 +43,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-dropzone": "^14.3.5",
+    "react-hot-toast": "^2.6.0",
     "tailwind-merge": "^2.5.4",
     "zustand": "^5.0.1"
   },
@@ -51,6 +56,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.4.1",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

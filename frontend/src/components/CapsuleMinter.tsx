@@ -5,14 +5,21 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useDropzone } from 'react-dropzone';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, Calendar, FileImage, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, Calendar, Loader2, CheckCircle, AlertCircle, Lock } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
-import { format } from 'date-fns';
+// import { format } from 'date-fns'; // Unused import
 import { WebSocketStatus } from '@/components/WebSocketStatus';
 import { ipfsService } from '@/services/ipfs';
+import { solanaService, CapsuleData } from '@/services/solana';
+import { encryptionService } from '@/services/encryption';
+import { nftService, CNFTMintOptions } from '@/services/nft';
 
-export function CapsuleMinter() {
-  const { connected, publicKey } = useWallet();
+interface CapsuleMinterProps {
+  onCapsuleCreated?: () => void;
+}
+
+export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
+  const { connected, publicKey, signTransaction, signMessage } = useWallet();
   const { minting, setMintingState, resetMinting, addCapsule } = useAppStore();
   const [mounted, setMounted] = useState(false);
 
@@ -30,6 +37,13 @@ export function CapsuleMinter() {
 
   const [errors, setErrors] = useState<string[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [showMintPrompt, setShowMintPrompt] = useState(false);
+  const [createdCapsule, setCreatedCapsule] = useState<{
+    address: string;
+    id: number;
+    signature: string;
+  } | null>(null);
+  const [mintAsCompressed, setMintAsCompressed] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -76,254 +90,443 @@ export function CapsuleMinter() {
   const handleCreateCapsule = async () => {
     if (!connected || !publicKey || !validateForm()) return;
 
+    // Check if wallet methods are available
+    if (!signTransaction || !signMessage) {
+      console.error('Wallet methods not available');
+      alert('Wallet not properly connected. Please reconnect your wallet.');
+      return;
+    }
+
     try {
       setMintingState({ isLoading: true, status: 'uploading', progress: 0 });
 
-      // 1) Upload image to IPFS
+      // 1) Upload image to Pinata
       const imageFile = formData.image!;
       const imageUpload = await ipfsService.uploadFileWithProgress(imageFile, (p) => {
         const mapped = Math.min(70, Math.max(0, Math.round(p.percentage * 0.7)));
         setMintingState({ status: 'uploading', progress: mapped });
       });
 
-      const imageCid = imageUpload.IpfsHash;
-      const imageUrl = imageUpload.url || ipfsService.getIPFSUrl(imageCid);
+      const pinataUrl = ipfsService.getIPFSUrl(imageUpload.IpfsHash);
+      setMintingState({ status: 'encrypting', progress: 75 });
 
-      // 2) Upload metadata JSON
-      const creatorAddress = publicKey.toBase58();
-      const metadataObject = ipfsService.createNFTMetadata({
-        name: formData.name,
-        description: formData.description,
-        imageCidOrHash: imageCid,
-        unlockDate: new Date(formData.unlockDate),
-        attributes: [
-          { trait_type: 'Category', value: 'Personal Memory' },
-          { trait_type: 'Created', value: format(new Date(), 'yyyy-MM-dd') },
-        ],
-        creatorAddress,
-        mimeType: imageFile.type || 'image/png',
-        externalUrl: 'https://dearfuture.app',
-      });
+      // 2) Encrypt the Pinata URL client-side
+      const unlockTimestamp = Math.floor(new Date(formData.unlockDate).getTime() / 1000);
+      const encryptedData = await encryptionService.encryptPinataUrl(
+        pinataUrl,
+        publicKey,
+        formData.name,
+        unlockTimestamp,
+        publicKey.toString()
+      );
 
-      const safeName = formData.name.trim().replace(/[^\w\-]+/g, '_').slice(0, 50) || 'capsule';
-      const metadataUpload = await ipfsService.uploadJSON(metadataObject, `${safeName}.json`);
+      setMintingState({ status: 'minting', progress: 85 });
 
-      setMintingState({ status: 'uploading', progress: 90 });
+      // 3) Create capsule on Solana
+      const capsuleData: CapsuleData = {
+        title: formData.name,
+        content: JSON.stringify({
+          description: formData.description,
+          encryptedImageUrl: encryptedData.encryptedUrl,
+          encryptedImageIv: encryptedData.iv,
+          unlockDate: unlockTimestamp
+        }),
+        unlockDate: unlockTimestamp,
+        encryptedImageUrl: encryptedData.encryptedUrl,
+        encryptedImageIv: encryptedData.iv
+      };
 
-      const metadataCid = metadataUpload.IpfsHash;
-      const metadataUri = ipfsService.getIPFSUrl(metadataCid);
-
-      // 3) Save capsule locally (no NFT minting)
-      addCapsule({
-        id: crypto.randomUUID(),
-        mint: null, // no NFT mint
-        name: formData.name,
-        description: formData.description,
-        imageUrl,
-        unlockDate: new Date(formData.unlockDate),
-        createdAt: new Date(),
-        owner: creatorAddress,
-        isLocked: new Date(formData.unlockDate) > new Date(),
-        metadata: {
-          uri: metadataUri,
-          imageUrl,
-          cid: metadataCid,
-          raw: metadataObject,
+      const result = await solanaService.createCapsule(
+        {
+          publicKey,
+          signTransaction: signTransaction!,
+          signMessage: signMessage!
         },
-      });
+        capsuleData
+      );
 
       setMintingState({ status: 'success', progress: 100 });
+      setCreatedCapsule({
+        address: result.capsuleAddress,
+        id: result.capsuleId,
+        signature: result.signature
+      });
 
-      // Reset form
-      setFormData({ name: '', description: '', unlockDate: '', image: null });
-      setPreviewUrl('');
+      // Add to local store
+      addCapsule({
+        id: result.capsuleAddress,
+        mint: '',
+        name: formData.name,
+        description: formData.description,
+        imageUrl: pinataUrl,
+        unlockDate: new Date(formData.unlockDate),
+        createdAt: new Date(),
+        owner: publicKey.toString(),
+        isLocked: true,
+        metadata: {
+          attributes: [
+            { trait_type: 'Category', value: 'Personal Memory' },
+            { trait_type: 'Unlock Date', value: formData.unlockDate },
+            { trait_type: 'Created At', value: new Date().toISOString() }
+          ]
+        }
+      });
+
+      // Notify parent component that capsule was created
+      if (onCapsuleCreated) {
+        onCapsuleCreated();
+      }
+
+      // Don't show mint prompt immediately - user can mint after unlock
+      // setShowMintPrompt(true);
+
     } catch (error) {
-      console.error('Capsule creation error:', error);
-      setMintingState({
-        status: 'error',
-        progress: 0,
-        error: error instanceof Error ? error.message : 'Failed to create capsule',
+      console.error('Error creating capsule:', error);
+      setMintingState({ 
+        status: 'error', 
+        progress: 0, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
       });
     }
   };
 
-  const resetMintingState = () => {
-    resetMinting();
+  const handleMintCNFT = async () => {
+    if (!createdCapsule || !publicKey) return;
+
+    try {
+      setMintingState({ isLoading: true, status: 'minting', progress: 0 });
+
+      // Prepare mint options
+      const mintOptions: CNFTMintOptions = {
+        useCompressedNFT: mintAsCompressed,
+        // Optional: specify tree address if you have a specific tree
+        // treeAddress: 'your-tree-address-here'
+      };
+
+      // Mint NFT using the NFT service (compressed or regular based on option)
+      const mintResult = await nftService.mintCapsule(
+        {
+          publicKey,
+          signTransaction: signTransaction!,
+          signMessage: signMessage!
+        },
+        {
+          name: formData.name,
+          description: formData.description,
+          image: formData.image!,
+          unlockDate: new Date(formData.unlockDate)
+        },
+        (step, progress) => {
+          setMintingState({ status: 'minting', progress });
+        },
+        mintOptions
+      );
+
+      setMintingState({ status: 'success', progress: 100 });
+
+      console.log(`${mintAsCompressed ? 'Compressed' : 'Regular'} NFT minted successfully:`, {
+        signature: mintResult.signature,
+        assetId: mintResult.assetId,
+        mint: mintResult.mint
+      });
+
+      // Update the capsule with mint information
+
+
+      // Close the mint prompt
+      setShowMintPrompt(false);
+      setCreatedCapsule(null);
+
+      // Reset form
+      setFormData({
+        name: '',
+        description: '',
+        unlockDate: '',
+        image: null
+      });
+      setPreviewUrl('');
+      resetMinting();
+
+    } catch (error) {
+      console.error('Error minting NFT:', error);
+      setMintingState({ 
+        status: 'error', 
+        progress: 0, 
+        error: error instanceof Error ? error.message : 'Failed to mint NFT' 
+      });
+    }
   };
 
-  if (minting.status === 'success') {
+  const handleSkipMint = () => {
+    setShowMintPrompt(false);
+    setCreatedCapsule(null);
+    resetMinting();
+    
+    // Reset form
+    setFormData({
+      name: '',
+      description: '',
+      unlockDate: '',
+      image: null
+    });
+    setPreviewUrl('');
+  };
+
+  if (!mounted) return null;
+
+  if (!connected) {
     return (
       <Card className="max-w-2xl mx-auto mx-4 md:mx-auto">
         <CardHeader className="text-center p-4 md:p-6">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-600" />
-          </div>
-          <CardTitle className="text-green-600">Capsule Created Successfully!</CardTitle>
-          <CardDescription>
-            Your memory capsule has been saved with IPFS metadata
+          <CardTitle className="text-lg md:text-xl">Connect Your Wallet</CardTitle>
+          <CardDescription className="text-sm md:text-base">
+            Please connect your Solana wallet to create memory capsules
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 text-center">
-          <Button onClick={resetMintingState} className="w-full">
-            Create Another Capsule
-          </Button>
+      </Card>
+    );
+  }
+
+  if (showMintPrompt && createdCapsule) {
+    return (
+      <Card className="max-w-2xl mx-auto mx-4 md:mx-auto">
+        <CardHeader className="text-center p-4 md:p-6">
+          <CardTitle className="text-lg md:text-xl flex items-center justify-center gap-2">
+            <CheckCircle className="text-green-500" />
+            Capsule Created Successfully!
+          </CardTitle>
+          <CardDescription className="text-sm md:text-base">
+            Your memory capsule &quot;{formData.name}&quot; has been created and stored on Solana.
+            <br />
+            <span className="text-xs text-gray-500">
+              Transaction: {createdCapsule.signature.slice(0, 8)}...{createdCapsule.signature.slice(-8)}
+            </span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-center">
+            <p className="text-sm text-gray-600 mb-4">
+              Would you like to mint this capsule as an NFT?
+            </p>
+            
+            {/* NFT Type Selection */}
+            <div className="mb-6 space-y-3">
+              <div className="flex items-center justify-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="nftType"
+                    checked={mintAsCompressed}
+                    onChange={() => setMintAsCompressed(true)}
+                    className="text-purple-600 focus:ring-purple-500"
+                  />
+                  <span className="text-sm">Compressed NFT (cNFT)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="nftType"
+                    checked={!mintAsCompressed}
+                    onChange={() => setMintAsCompressed(false)}
+                    className="text-purple-600 focus:ring-purple-500"
+                  />
+                  <span className="text-sm">Regular NFT</span>
+                </label>
+              </div>
+              
+              {/* Explanation */}
+              <div className="text-xs text-gray-500 max-w-md mx-auto">
+                {mintAsCompressed ? (
+                  <p>
+                    <strong>Compressed NFT:</strong> Lower cost, stored efficiently in Merkle trees. 
+                    Perfect for large collections and memory capsules.
+                  </p>
+                ) : (
+                  <p>
+                    <strong>Regular NFT:</strong> Traditional NFT with individual token account. 
+                    Higher cost but maximum compatibility.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <Button 
+                onClick={handleMintCNFT}
+                disabled={minting.isLoading}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                {minting.isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Minting {mintAsCompressed ? 'cNFT' : 'NFT'}...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="mr-2 h-4 w-4" />
+                    Mint {mintAsCompressed ? 'cNFT' : 'NFT'}
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleSkipMint}
+                disabled={minting.isLoading}
+              >
+                Skip for Now
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4 md:space-y-6 px-4 md:px-0">
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="text-lg md:text-xl lg:text-2xl">Create Memory Capsule</CardTitle>
-          <CardDescription className="text-sm md:text-base">
-            Upload an image and create a time-locked memory capsule (stored on IPFS)
-          </CardDescription>
-          <div className="mt-3">
-            <WebSocketStatus />
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 md:space-y-6 p-4 md:p-6">
-          {/* Image Upload */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Memory Image</label>
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                isDragActive
-                  ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
-                  : 'border-gray-300 hover:border-amber-400'
-              }`}
-            >
-              <input {...getInputProps()} />
-              {previewUrl ? (
-                <div className="space-y-4">
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    className="max-w-full max-h-48 mx-auto rounded-lg"
-                  />
-                  <p className="text-sm text-gray-600">Click or drag to replace image</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <FileImage className="w-12 h-12 mx-auto text-gray-400" />
-                  <div>
-                    <p className="text-lg font-medium">
-                      {isDragActive ? 'Drop your image here' : 'Upload your memory'}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Drag & drop or click to select (Max 10MB, JPG/PNG/GIF/WebP)
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+    <Card className="max-w-2xl mx-auto mx-4 md:mx-auto">
+      <CardHeader className="text-center p-4 md:p-6">
+        <CardTitle className="text-lg md:text-xl">Create Memory Capsule</CardTitle>
+        <CardDescription className="text-sm md:text-base">
+          Upload an image and write a message to your future self
+        </CardDescription>
+        <WebSocketStatus />
+      </CardHeader>
 
-          {/* Capsule Name */}
+      <CardContent className="space-y-6 p-4 md:p-6">
+        {/* Image Upload */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Capsule Image</label>
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+              isDragActive ? 'border-purple-400 bg-purple-50' : 'border-gray-300 hover:border-gray-400'
+            }`}
+          >
+            <input {...getInputProps()} />
+            {previewUrl ? (
+              <div className="space-y-2">
+                <img src={previewUrl} alt="Preview" className="mx-auto max-h-32 rounded" />
+                <p className="text-sm text-gray-600">Click to change image</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                <p className="text-sm text-gray-600">
+                  {isDragActive ? 'Drop the image here' : 'Drag & drop an image, or click to select'}
+                </p>
+                <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Form Fields */}
+        <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Capsule Name</label>
+            <label className="text-sm font-medium">Capsule Name</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
-              placeholder="Give your memory a meaningful name..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-              maxLength={50}
+              placeholder="Enter a name for your capsule"
+              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
 
-          {/* Description */}
           <div>
-            <label className="block text-sm font-medium mb-2">Description</label>
+            <label className="text-sm font-medium">Message</label>
             <textarea
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
-              placeholder="Describe this memory and why it's special..."
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-              maxLength={500}
+              placeholder="Write a message to your future self..."
+              rows={3}
+              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
 
-          {/* Unlock Date */}
           <div>
-            <label className="block text-sm font-medium mb-2">
-              <Calendar className="w-4 h-4 inline mr-1" />
-              Unlock Date
-            </label>
-            <input
-              type="datetime-local"
-              value={formData.unlockDate}
-              onChange={(e) => handleInputChange('unlockDate', e.target.value)}
-              min={new Date().toISOString().slice(0, 16)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-600 mt-1">
-              This memory will be locked until the specified date and time
-            </p>
+            <label className="text-sm font-medium">Unlock Date</label>
+            <div className="mt-1 relative">
+              <Calendar className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+              <input
+                type="datetime-local"
+                value={formData.unlockDate}
+                onChange={(e) => handleInputChange('unlockDate', e.target.value)}
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
           </div>
+        </div>
 
-          {/* Errors */}
-          {errors.length > 0 && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <div className="flex items-start space-x-2">
-                <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                <div>
-                  <h4 className="text-red-800 dark:text-red-200 font-medium">Please fix the following issues:</h4>
-                  <ul className="text-red-700 dark:text-red-300 text-sm mt-1 space-y-1">
-                    {errors.map((error, index) => (
-                      <li key={index}>• {error}</li>
-                    ))}
-                  </ul>
-                </div>
+        {/* Error Display */}
+        {errors.length > 0 && (
+          <div className="space-y-2">
+            {errors.map((error, index) => (
+              <div key={index} className="flex items-center gap-2 text-red-600 text-sm">
+                <AlertCircle className="h-4 w-4" />
+                {error}
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        )}
 
-          {/* Progress */}
-          {minting.isLoading && (
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-              <div className="flex items-center space-x-3">
-                <Loader2 className="w-5 h-5 text-amber-600 animate-spin" />
-                <div className="flex-1">
-                  <p className="text-amber-800 dark:text-amber-200 font-medium">
-                    {minting.status === 'uploading' && 'Uploading to IPFS...'}
-                  </p>
-                  <div className="w-full bg-amber-200 dark:bg-amber-800 rounded-full h-2 mt-2">
-                    <div
-                      className="bg-amber-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${minting.progress}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
+        {/* Progress Display */}
+        {minting.isLoading && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span>
+                {minting.status === 'uploading' && 'Uploading to IPFS...'}
+                {minting.status === 'encrypting' && 'Encrypting data...'}
+                {minting.status === 'minting' && 'Creating capsule on Solana...'}
+              </span>
+              <span>{minting.progress}%</span>
             </div>
-          )}
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${minting.progress}%` }}
+              />
+            </div>
+          </div>
+        )}
 
-          {/* Submit */}
+        {/* Action Buttons */}
+        <div className="flex gap-3">
           <Button
             onClick={handleCreateCapsule}
-            disabled={!mounted || !connected || minting.isLoading}
-            className="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700"
-            size="lg"
+            disabled={minting.isLoading || !formData.name || !formData.description || !formData.image || !formData.unlockDate}
+            className="flex-1 bg-purple-600 hover:bg-purple-700"
           >
             {minting.isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Creating Capsule...
               </>
             ) : (
               <>
-                <Upload className="w-4 h-4 mr-2" />
-                Create Memory Capsule
+                <Lock className="mr-2 h-4 w-4" />
+                Create Capsule
               </>
             )}
           </Button>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        {/* Success Message */}
+        {minting.status === 'success' && (
+          <div className="flex items-center gap-2 text-green-600 text-sm">
+            <CheckCircle className="h-4 w-4" />
+            Capsule created successfully! Check your wallet for the transaction.
+          </div>
+        )}
+
+        {/* Error Message */}
+        {minting.status === 'error' && minting.error && (
+          <div className="flex items-center gap-2 text-red-600 text-sm">
+            <AlertCircle className="h-4 w-4" />
+            {minting.error}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

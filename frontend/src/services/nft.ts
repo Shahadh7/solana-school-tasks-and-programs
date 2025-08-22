@@ -1,8 +1,8 @@
-import { Connection, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js'
-import { ipfsService } from './ipfs'
-// Removed unused import: createDummyCapsule
-import { createOptimizedConnection } from '@/lib/rpc-config'
-import { heliusWebSocket } from './helius-websocket'
+import { Connection, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { ipfsService } from './ipfs';
+import { createOptimizedConnection } from '@/lib/rpc-config';
+import { heliusWebSocket } from './helius-websocket';
+import { cnftService, MintCNFTParams, CNFTMintResult } from './cnft';
 
 export interface MintCapsuleParams {
   name: string
@@ -34,10 +34,16 @@ export interface Wallet {
 export interface MintResult {
   signature: string
   mint: string
+  assetId: string
   metadata: CapsuleMetadata & {
     imageUrl: string
     uri: string
   }
+}
+
+export interface CNFTMintOptions {
+  useCompressedNFT?: boolean
+  treeAddress?: string
 }
 
 class NFTService {
@@ -68,7 +74,7 @@ class NFTService {
       const metadata = ipfsService.createNFTMetadata({
         name: params.name,
         description: params.description,
-        imageHash: imageUpload.IpfsHash,
+        imageCidOrHash: imageUpload.IpfsHash,
         unlockDate: params.unlockDate,
         attributes: params.attributes,
       })
@@ -93,68 +99,19 @@ class NFTService {
   }
 
   /**
-   * Mint a memory capsule with real-time WebSocket monitoring
-   * Enhanced with Helius WebSocket for transaction tracking
+   * Mint a compressed NFT (cNFT) for a memory capsule using Metaplex Bubblegum v2
    */
   async mintCapsule(
     wallet: Wallet,
     params: MintCapsuleParams,
-    onProgress?: (step: string, progress: number) => void
+    onProgress?: (step: string, progress: number) => void,
+    options: CNFTMintOptions = { useCompressedNFT: true }
   ): Promise<MintResult> {
     try {
-      onProgress?.('Uploading image to IPFS...', 20)
-      
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      onProgress?.('Creating metadata...', 50)
-      
-      // Create a dummy image URL for demo purposes
-      const imageUrl = URL.createObjectURL(params.image)
-      
-      // Simulate metadata creation delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      onProgress?.('Minting compressed NFT...', 80)
-      
-      // Simulate minting delay
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
-      // Generate mock results for demo
-      const mockSignature = `demo_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      const mockMint = `demo_mint_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
-      const metadata = {
-        name: params.name,
-        description: params.description,
-        image: imageUrl,
-        attributes: [
-          {
-            trait_type: 'Unlock Date',
-            value: params.unlockDate.toISOString(),
-          },
-          {
-            trait_type: 'Created At',
-            value: new Date().toISOString(),
-          },
-          {
-            trait_type: 'Type',
-            value: 'Memory Capsule',
-          },
-          ...(params.attributes || []),
-        ],
-      }
-
-      onProgress?.('Minting completed!', 100)
-
-      return {
-        signature: mockSignature,
-        mint: mockMint,
-        metadata: {
-          ...metadata,
-          imageUrl,
-          uri: `demo://metadata/${mockMint}`,
-        },
+      if (options.useCompressedNFT) {
+        return await this.mintCompressedCapsule(wallet, params, onProgress, options.treeAddress)
+      } else {
+        return await this.mintRegularCapsule(wallet, params, onProgress)
       }
     } catch (error) {
       console.error('Error minting capsule:', error)
@@ -163,15 +120,169 @@ class NFTService {
   }
 
   /**
-   * Get compressed NFTs owned by a wallet
+   * Mint a compressed NFT using Metaplex Bubblegum v2
    */
-  async getWalletNFTs(_walletAddress: PublicKey): Promise<CapsuleMetadata[]> {
+  private async mintCompressedCapsule(
+    wallet: Wallet,
+    params: MintCapsuleParams,
+    onProgress?: (step: string, progress: number) => void,
+    treeAddress?: string
+  ): Promise<MintResult> {
     try {
-      // TODO: Implement with Digital Asset Standard (DAS) API or Helius
-      // For now, return empty array
-      return []
+      onProgress?.('Initializing cNFT service...', 10)
+      
+      // Initialize the cNFT service with the wallet
+      await cnftService.initialize(wallet)
+
+      // Check if we have a default tree
+      let tree = cnftService.getDefaultTree()
+      if (!tree && !treeAddress) {
+        throw new Error('No Merkle tree available. Please create a tree first using the admin script or provide a tree address.')
+      } else if (treeAddress) {
+        // Use provided tree address
+        const { publicKey } = await import('@metaplex-foundation/umi')
+        tree = publicKey(treeAddress)
+        cnftService.setDefaultTree(tree)
+      }
+
+      onProgress?.('Preparing cNFT metadata...', 25)
+
+      // Convert MintCapsuleParams to MintCNFTParams
+      const cnftParams: MintCNFTParams = {
+        name: params.name,
+        description: params.description,
+        image: params.image,
+        unlockDate: params.unlockDate,
+        recipient: params.recipient,
+        attributes: params.attributes
+      }
+
+      // Validate parameters (allow past unlock dates for existing unlocked capsules)
+      const validation = cnftService.validateMintParams(cnftParams, true)
+      if (!validation.isValid) {
+        throw new Error(`Invalid parameters: ${validation.errors.join(', ')}`)
+      }
+
+      onProgress?.('Minting compressed NFT...', 40)
+
+      // Mint the compressed NFT
+      const cnftResult: CNFTMintResult = await cnftService.mintCNFT(
+        cnftParams,
+        tree,
+        (step, progress) => {
+          // Map cNFT service progress to our progress range (40-95)
+          const mappedProgress = 40 + Math.round((progress / 100) * 55)
+          onProgress?.(step, mappedProgress)
+        }
+      )
+
+      onProgress?.('cNFT minting completed!', 100)
+
+      // Convert CNFTMintResult to MintResult format
+      return {
+        signature: cnftResult.signature,
+        mint: cnftResult.assetId, // Use assetId as mint for cNFTs
+        assetId: cnftResult.assetId,
+        metadata: {
+          name: cnftResult.metadata.name,
+          description: cnftResult.metadata.description,
+          image: cnftResult.metadata.image,
+          external_url: cnftResult.metadata.external_url,
+          attributes: cnftResult.metadata.attributes.map(attr => ({
+            trait_type: attr.trait_type,
+            value: String(attr.value)
+          })),
+          properties: cnftResult.metadata.properties,
+          imageUrl: cnftResult.metadata.imageUrl,
+          uri: cnftResult.metadata.metadataUri,
+        },
+      }
     } catch (error) {
-      console.error('Error fetching wallet NFTs:', error)
+      console.error('Error minting compressed NFT:', error)
+      throw new Error(`Failed to mint compressed NFT: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  /**
+   * Mint a regular NFT (fallback method)
+   */
+  private async mintRegularCapsule(
+    wallet: Wallet,
+    params: MintCapsuleParams,
+    onProgress?: (step: string, progress: number) => void
+  ): Promise<MintResult> {
+    try {
+      onProgress?.('Preparing metadata...', 20)
+      
+      // Prepare metadata and upload to IPFS
+      const { imageUrl, metadataUri, metadata } = await this.prepareCapsuleMetadata(params, onProgress)
+      
+      onProgress?.('Minting regular NFT...', 60)
+      
+      // For now, we'll simulate the regular NFT minting process
+      // In a real implementation, you would use Metaplex Token Metadata to mint regular NFTs
+      
+      // Simulate minting delay
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Generate mock results for demo
+      const mockSignature = `nft_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const mockMint = `nft_mint_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const mockAssetId = `asset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      onProgress?.('Regular NFT minting completed!', 100)
+
+      return {
+        signature: mockSignature,
+        mint: mockMint,
+        assetId: mockAssetId,
+        metadata: {
+          ...metadata,
+          imageUrl,
+          uri: metadataUri,
+        },
+      }
+    } catch (error) {
+      console.error('Error minting regular NFT:', error)
+      throw new Error(`Failed to mint regular NFT: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  /**
+   * Get compressed NFTs owned by a wallet using DAS API
+   */
+  async getWalletNFTs(walletAddress: PublicKey): Promise<CapsuleMetadata[]> {
+    try {
+      // Convert Solana PublicKey to UMI PublicKey
+      const { publicKey } = await import('@metaplex-foundation/umi')
+      const umiPublicKey = publicKey(walletAddress.toString())
+
+      // Fetch cNFTs using the cNFT service
+      const assets = await cnftService.fetchWalletCNFTs(umiPublicKey)
+
+      // Convert DAS assets to CapsuleMetadata format
+      const capsules: CapsuleMetadata[] = assets
+        .filter(asset => asset.content?.metadata) // Only assets with metadata
+        .map(asset => {
+          const metadata = asset.content!.metadata!
+          return {
+            name: metadata.name || 'Unnamed Capsule',
+            description: metadata.description || '',
+            image: String(metadata.image || ''),
+            external_url: metadata.external_url,
+            attributes: metadata.attributes?.map(attr => ({
+              trait_type: attr.trait_type || 'Unknown',
+              value: attr.value?.toString() || ''
+            })) || [],
+            properties: metadata.properties
+          }
+        })
+
+      console.log(`Found ${capsules.length} cNFTs for wallet ${walletAddress.toString()}`)
+      return capsules
+    } catch (error) {
+      console.error('Error fetching wallet cNFTs:', error)
+      // Return empty array on error to prevent UI breaks
       return []
     }
   }
@@ -180,14 +291,15 @@ class NFTService {
    * Transfer a memory capsule to another wallet
    */
   async transferCapsule(
-    _wallet: Wallet,
-    _params: {
+    wallet: Wallet,
+    params: {
       assetId: string
       newOwner: PublicKey
     }
   ): Promise<string> {
     try {
-      // TODO: Implement compressed NFT transfer
+      console.log('Transfer requested for:', params.assetId, 'to:', params.newOwner.toString(), 'from:', wallet.publicKey.toString())
+  
       throw new Error('Transfer functionality will be implemented in the next iteration')
     } catch (error) {
       console.error('Error transferring capsule:', error)

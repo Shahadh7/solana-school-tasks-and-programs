@@ -10,6 +10,7 @@ A decentralized memory locker built with **Next.js**, **Solana**, **IPFS**, and 
 - **IPFS Storage**: Secure, decentralized storage via Pinata
 - **Time Locks**: Set future unlock dates for your memories
 - **Beautiful UI**: Modern, responsive design with Tailwind CSS and Radix UI
+- **Real-time Updates**: WebSocket integration for live transaction monitoring
 
 ## 🚀 Quick Start
 
@@ -25,36 +26,57 @@ A decentralized memory locker built with **Next.js**, **Solana**, **IPFS**, and 
 # Install dependencies
 npm install
 
-# Create environment file
-cp .env.example .env.local
+# Create environment file and configure variables (see below)
 ```
 
-### Environment Variables
+## 🔧 Environment Configuration
 
-Create a `.env.local` file with:
+Create a `.env.local` file in the frontend directory with these variables:
 
-```env
+### Required Variables
+```bash
 # Solana Configuration
 NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com
+NEXT_PUBLIC_NETWORK=devnet
+NEXT_PUBLIC_PROGRAM_ID=5BY4zzPL5qWSwDeArRD82YpSY1utsJGBsgNisTPpuHTm
 
-# IPFS / Pinata Configuration (Required)
-NEXT_PUBLIC_PINATA_JWT=your_pinata_jwt_token_here
+# IPFS Configuration (Required)
+PINATA_JWT=your_pinata_jwt_token_here
 NEXT_PUBLIC_PINATA_GATEWAY=https://gateway.pinata.cloud
+```
 
-# Optional: Helius for better RPC performance
-# NEXT_PUBLIC_RPC_URL=https://devnet.helius-rpc.com/?api-key=YOUR_API_KEY
+### Optional (Enhanced Features)
+```bash
+# Helius (for better performance and cNFT support)
+NEXT_PUBLIC_HELIUS_API_KEY=your_helius_api_key_here
+NEXT_PUBLIC_HELIUS_DAS_URL=https://api.helius.xyz
+
+# Compressed NFTs
+NEXT_PUBLIC_MERKLE_TREE_ADDRESS=your_tree_address_here
 
 # Application Settings
 NEXT_PUBLIC_APP_NAME=DearFuture Web3
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-### Getting Pinata JWT
+### Service Setup
 
-1. Sign up at [Pinata.cloud](https://pinata.cloud)
-2. Go to API Keys section
-3. Create a new JWT token
-4. Add it to your `.env.local` file
+#### 1. Pinata IPFS (Required)
+1. Sign up at [Pinata.cloud](https://pinata.cloud) (1GB free)
+2. Go to "API Keys" → "New Key"
+3. Enable permissions: `pinFileToIPFS`, `pinJSONToIPFS`, `hashMetadata`
+4. Copy the JWT token and set `PINATA_JWT=your_jwt_token`
+
+#### 2. Helius RPC (Optional - for better performance)
+1. Visit [Helius Dashboard](https://dashboard.helius.dev/)
+2. Create a free account and get API key
+3. Set `NEXT_PUBLIC_RPC_URL=https://devnet.helius-rpc.com/?api-key=YOUR_KEY`
+4. Set `NEXT_PUBLIC_HELIUS_API_KEY=YOUR_KEY`
+
+#### 3. Compressed NFT Setup
+1. Ensure Helius API key is configured
+2. Run: `npm run create-tree`
+3. Copy the generated address to `NEXT_PUBLIC_MERKLE_TREE_ADDRESS`
 
 ### Development
 

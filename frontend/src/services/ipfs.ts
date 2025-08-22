@@ -20,7 +20,6 @@ class IPFSService {
       process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gateway.pinata.cloud";
     if (!process.env.NEXT_PUBLIC_PINATA_GATEWAY) {
       // Not an error; project can still work on the shared gateway
-      console.warn("ℹ️ Using shared Pinata gateway. Consider a dedicated one for production.");
     }
   }
 

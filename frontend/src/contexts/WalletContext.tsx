@@ -28,16 +28,7 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
   // Get network configuration
   const network = useMemo(() => getNetwork(), []);
 
-  // Log RPC provider info for debugging
-  useMemo(() => {
-    if (isUsingHelius()) {
-      console.log('🚀 Using Helius RPC for enhanced performance');
-    } else {
-      console.log('📡 Using default Solana RPC');
-    }
-    console.log('🌐 Network:', network);
-    console.log('🔗 Endpoint:', endpoint);
-  }, [endpoint, network]);
+
 
   const wallets = useMemo(
     () => [

@@ -159,22 +159,32 @@ class HeliusWebSocketService {
         throw new Error('onSignature method not available in this Solana web3.js version');
       }
 
-      // Use onSignature for transaction confirmation
-      const subscriptionId = await this.connection.onSignature(
-        signature,
-        (result, context) => {
-          // Emit WebSocket event
-          this.emitEvent('transaction-confirmation', {
-            signature,
-            result,
-            context
-          });
-          
-          // Call the callback
-          callback({ signature, result, context });
-        },
-        commitment
-      );
+      // Use confirmTransaction for transaction confirmation (more reliable)
+      let subscriptionId: number | null = null;
+      
+      try {
+        subscriptionId = await this.connection.onSignature(
+          signature,
+          (result, context) => {
+            // Emit WebSocket event
+            this.emitEvent('transaction-confirmation', {
+              signature,
+              result,
+              context
+            });
+            
+            // Call the callback
+            callback({ signature, result, context });
+          },
+          commitment
+        );
+      } catch (error) {
+        console.warn('onSignature failed, falling back to polling:', error);
+        
+        // Fallback to polling if WebSocket subscription fails
+        this.pollTransactionStatus(signature, callback, commitment);
+        return `poll-${signature}`;
+      }
 
       const subscriptionKey = `transaction-${signature}`;
       this.transactionSubscriptions.set(subscriptionKey, subscriptionId);
@@ -287,6 +297,68 @@ class HeliusWebSocketService {
       this.accountSubscriptions.delete(subscriptionKey);
       console.log(`🔕 Unsubscribed from account: ${subscriptionKey}`);
     }
+  }
+
+  /**
+   * Fallback polling method for transaction confirmation
+   */
+  private async pollTransactionStatus(
+    signature: string,
+    callback: (confirmation: unknown) => void,
+    commitment: 'confirmed' | 'finalized' = 'confirmed'
+  ): Promise<void> {
+    const maxAttempts = 30; // 30 attempts = 60 seconds max
+    let attempts = 0;
+
+    const poll = async () => {
+      try {
+        const status = await this.connection.getSignatureStatus(signature, {
+          searchTransactionHistory: true
+        });
+
+        if (status.value?.confirmationStatus === commitment || 
+            status.value?.confirmationStatus === 'finalized') {
+          // Transaction confirmed
+          callback({
+            signature,
+            result: { err: status.value.err },
+            context: { slot: 0 }
+          });
+          return;
+        }
+
+        if (status.value?.err) {
+          // Transaction failed
+          callback({
+            signature,
+            result: { err: status.value.err },
+            context: { slot: 0 }
+          });
+          return;
+        }
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000); // Poll every 2 seconds
+        } else {
+          // Timeout
+          callback({
+            signature,
+            result: { err: 'Transaction confirmation timeout' },
+            context: { slot: 0 }
+          });
+        }
+      } catch (error) {
+        console.error('Error polling transaction status:', error);
+        callback({
+          signature,
+          result: { err: `Polling error: ${error}` },
+          context: { slot: 0 }
+        });
+      }
+    };
+
+    poll();
   }
 
   /**
