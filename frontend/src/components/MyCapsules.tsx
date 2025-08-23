@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Calendar, Lock, Unlock, Share2, Eye, Loader2, ArrowRightLeft, ExternalLink, Maximize2, X } from 'lucide-react';
+import { Clock, Calendar, Lock, Unlock, Share2, Eye, Loader2, ArrowRightLeft, ExternalLink, Maximize2, X, Edit3 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import bs58 from 'bs58';
 import { useAppStore, Capsule } from '@/stores/appStore';
@@ -15,6 +15,7 @@ import { nftService, CNFTMintOptions } from '@/services/nft';
 import { cnftService } from '@/services/cnft';
 import { MintTransactionStatus } from '@/services/helius-das';
 import { PublicKey } from '@solana/web3.js';
+import { CapsuleUpdateModal } from '@/components/CapsuleUpdateModal';
 
 export function MyCapsules() {
   const { connected, publicKey, signTransaction, signMessage } = useWallet();
@@ -33,6 +34,7 @@ export function MyCapsules() {
   const [transferCNFT, setTransferCNFT] = useState(false);
   const [showNFTViewer, setShowNFTViewer] = useState<string | null>(null);
   const [showFullscreenImage, setShowFullscreenImage] = useState<string | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState<string | null>(null);
 
   // Utility function to convert signature to base58 format
   const convertSignatureToBase58 = (signature: unknown): string => {
@@ -846,6 +848,19 @@ export function MyCapsules() {
                   <span className="font-semibold">View</span>
                 </Button>
 
+                {/* Update Button - Show for all locked capsules */}
+                {capsule.isLocked && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowUpdateModal(capsule.id)}
+                    className="flex-1 min-w-[120px] bg-white/5 hover:bg-blue-400/10 text-white hover:text-blue-200 border-blue-400/30 hover:border-blue-400/60 transition-all duration-300 px-4 py-2.5 rounded-xl"
+                  >
+                    <Edit3 className="h-4 w-4 mr-2" />
+                    <span className="font-semibold">Update</span>
+                  </Button>
+                )}
+
                 {capsule.isLocked && isUnlocked(capsule.unlockDate) && (
                   <Button
                     size="sm"
@@ -1123,6 +1138,8 @@ export function MyCapsules() {
                     </Button>
                   )}
 
+
+
                   <Button
                     variant="outline"
                     onClick={handleCloseCapsule}
@@ -1140,8 +1157,8 @@ export function MyCapsules() {
       {/* Mint NFT Dialog */}
       {showMintDialog && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full border border-amber-400/30 backdrop-blur-xl">
-            <div className="p-8">
+          <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] border border-amber-400/30 backdrop-blur-xl overflow-hidden">
+            <div className="p-8 overflow-y-auto max-h-[calc(90vh-64px)]">
               <div className="text-center mb-8">
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-500 to-violet-600 rounded-3xl mb-6 shadow-2xl shadow-purple-500/30">
                   <Lock className="h-10 w-10 text-white" />
@@ -1230,8 +1247,8 @@ export function MyCapsules() {
         if (!isOwner && !isTransferredCapsule) {
           return (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-              <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full border border-amber-400/30 backdrop-blur-xl">
-                <div className="p-8">
+              <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] border border-amber-400/30 backdrop-blur-xl overflow-hidden">
+                <div className="p-8 overflow-y-auto max-h-[calc(90vh-64px)]">
                   <div className="text-center mb-8">
                     <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-400 to-red-600 rounded-3xl mb-6 shadow-2xl shadow-red-400/30">
                       <X className="h-10 w-10 text-white" />
@@ -1267,8 +1284,8 @@ export function MyCapsules() {
         
         return (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-            <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full border border-amber-400/30 backdrop-blur-xl">
-              <div className="p-8">
+            <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] border border-amber-400/30 backdrop-blur-xl overflow-hidden">
+              <div className="p-8 overflow-y-auto max-h-[calc(90vh-64px)]">
                 <div className="text-center mb-8">
                   <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-3xl mb-6 shadow-2xl shadow-amber-400/30">
                     <ArrowRightLeft className="h-10 w-10 text-black" />
@@ -1387,8 +1404,8 @@ export function MyCapsules() {
       {/* NFT Viewer Dialog */}
       {showNFTViewer && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-gradient-to-br from-slate-900/95 via-black/90 to-slate-800/95 rounded-3xl shadow-2xl max-w-7xl w-full border border-slate-600/30 backdrop-blur-xl overflow-hidden">
-            <div className="p-8">
+          <div className="bg-gradient-to-br from-slate-900/95 via-black/90 to-slate-800/95 rounded-3xl shadow-2xl max-w-7xl w-full max-h-[90vh] border border-slate-600/30 backdrop-blur-xl overflow-hidden">
+            <div className="p-8 overflow-y-auto max-h-[calc(90vh-64px)]">
               {/* Header */}
               <div className="text-center mb-10">
                 <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-emerald-400 via-green-500 to-teal-600 rounded-3xl mb-6 shadow-2xl shadow-emerald-400/20">
@@ -1637,6 +1654,24 @@ export function MyCapsules() {
           </div>
         </div>
       )}
+
+      {/* Capsule Update Modal */}
+      {showUpdateModal && (() => {
+        const capsule = userCapsules.find(c => c.id === showUpdateModal);
+        if (!capsule) return null;
+        
+        return (
+          <CapsuleUpdateModal
+            capsule={capsule}
+            isOpen={!!showUpdateModal}
+            onClose={() => setShowUpdateModal(null)}
+            onUpdate={() => {
+              // Reload capsules to get fresh data
+              loadUserCapsules();
+            }}
+          />
+        );
+      })()}
 
       {/* Toast Container */}
       <Toaster
