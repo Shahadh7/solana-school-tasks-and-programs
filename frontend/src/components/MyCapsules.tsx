@@ -16,6 +16,7 @@ import { cnftService } from '@/services/cnft';
 import { MintTransactionStatus } from '@/services/helius-das';
 import { PublicKey } from '@solana/web3.js';
 import { CapsuleUpdateModal } from '@/components/CapsuleUpdateModal';
+import { Transaction, VersionedTransaction } from '@solana/web3.js';
 
 export function MyCapsules() {
   const { connected, publicKey, signTransaction, signMessage } = useWallet();
@@ -60,6 +61,31 @@ export function MyCapsules() {
     }
   };
 
+  // Create a type-safe wallet wrapper for solanaService calls
+  const createWalletWrapper = () => {
+    if (!publicKey || !signTransaction || !signMessage) return null;
+    
+    return {
+      publicKey,
+      signTransaction: async <T extends Transaction | VersionedTransaction>(transaction: T): Promise<T> => {
+        return signTransaction(transaction);
+      },
+      signMessage
+    };
+  };
+
+  // Helper function to check if a capsule has been minted as an NFT
+  const hasMintedNFT = (capsule: Capsule): boolean => {
+    // Check multiple indicators for NFT status
+    return !!(
+      capsule.mint || 
+      capsule.metadata?.mintCreator || 
+      capsule.metadata?.assetId ||
+      capsule.metadata?.transferredAt ||
+      capsule.metadata?.nftMinted
+    );
+  };
+
   useEffect(() => {
     if (connected && publicKey) {
       loadUserCapsules();
@@ -72,14 +98,12 @@ export function MyCapsules() {
     
     setLoading(true);
     try {
+      // Create a type-safe wallet wrapper
+      const walletWrapper = createWalletWrapper();
+      if (!walletWrapper) return;
+
       // Fetch real capsules from Solana
-      const solanaCapsules = await solanaService.getWalletCapsules({
-        publicKey,
-        signTransaction: signTransaction!,
-        signMessage: signMessage!
-      });
-
-
+      const solanaCapsules = await solanaService.getWalletCapsules(walletWrapper);
 
       // Transform Solana data to our app format
       const transformedCapsules: Capsule[] = await Promise.all(solanaCapsules.map(async (solanaCapsule: Record<string, unknown>) => {
@@ -90,14 +114,11 @@ export function MyCapsules() {
           contentData = { description: solanaCapsule.content };
         }
 
-
-
         let imageUrl = '';
         
         // If capsule is already unlocked, decrypt the image URL
         if (solanaCapsule.isUnlocked && contentData.encryptedImageUrl) {
           try {
-            
             const decryptedImageUrl = await encryptionService.decryptPinataUrl(
               {
                 encryptedUrl: contentData.encryptedImageUrl,
@@ -161,28 +182,19 @@ export function MyCapsules() {
         return capsule;
       }));
 
-
-      
-      // Restore NFT minting status from localStorage
+      // Check NFT minting status from on-chain data instead of localStorage
       const capsulesWithNFTStatus = transformedCapsules.map(capsule => {
-        const savedNFTStatus = localStorage.getItem(`capsule_nft_${capsule.id}`);
-        if (savedNFTStatus) {
-          try {
-            const nftData = JSON.parse(savedNFTStatus);
-
-            return {
-              ...capsule,
-              metadata: {
-                ...capsule.metadata,
-                nftMinted: nftData.nftMinted,
-                mintSignature: nftData.mintSignature
-              }
-            };
-          } catch {
-            // Failed to parse saved NFT status
+        // Use the helper function to check multiple indicators for NFT status
+        const nftMinted = hasMintedNFT(capsule);
+        
+        return {
+          ...capsule,
+          metadata: {
+            ...capsule.metadata,
+            nftMinted,
+            mintSignature: capsule.mint || capsule.metadata?.mintCreator || undefined
           }
-        }
-        return capsule;
+        };
       });
       
       setUserCapsules(capsulesWithNFTStatus);
@@ -279,13 +291,7 @@ export function MyCapsules() {
               
               updateCapsule(capsule.id, updatedCapsule);
               
-              // Save NFT status to localStorage for persistence
-              localStorage.setItem(`capsule_nft_${capsule.id}`, JSON.stringify({
-                nftMinted: true,
-                mintSignature: mintResult.signature
-              }));
-              
-              // Force reload capsules to ensure UI updates
+              // Force reload capsules to ensure UI updates and get fresh on-chain data
               setTimeout(() => {
                 loadUserCapsules();
               }, 1000);
@@ -324,11 +330,10 @@ export function MyCapsules() {
         
         updateCapsule(capsule.id, updatedCapsuleData);
         
-        // Save to localStorage immediately for persistence
-        localStorage.setItem(`capsule_nft_${capsule.id}`, JSON.stringify({
-          nftMinted: true,
-          mintSignature: mintResult.signature
-        }));
+        // Force reload capsules to ensure UI updates and get fresh on-chain data
+        setTimeout(() => {
+          loadUserCapsules();
+        }, 1000);
         
 
       }
@@ -430,14 +435,9 @@ export function MyCapsules() {
 
       // Transfer the capsule using the Solana service
       const transferResult = await solanaService.transferCapsule(
-        {
-          publicKey,
-          signTransaction: signTransaction!,
-          signMessage: signMessage!
-        },
+        createWalletWrapper()!,
         capsule.id,
-        cleanAddress,
-        transferCNFT ? capsule.mint : undefined // Include mint address if transferring CNFT
+        cleanAddress
       );
 
       // If CNFT transfer is requested and the capsule has a mint address
@@ -559,22 +559,17 @@ export function MyCapsules() {
       if (capsule.isLocked) {
         // Unlock the capsule on Solana
         await solanaService.unlockCapsule(
-          {
-            publicKey,
-            signTransaction: signTransaction!,
-            signMessage: signMessage!
-          },
+          createWalletWrapper()!,
           capsule.id
         );
       }
 
       // Get the encrypted data from the capsule content
       // We need to fetch the capsule data again to get the encrypted content
-      const solanaCapsules = await solanaService.getWalletCapsules({
-        publicKey,
-        signTransaction: signTransaction!,
-        signMessage: signMessage!
-      });
+      const walletWrapper = createWalletWrapper();
+      if (!walletWrapper) return;
+      
+      const solanaCapsules = await solanaService.getWalletCapsules(walletWrapper);
       
       const currentCapsule = solanaCapsules.find((c: Record<string, unknown>) => c.address as string === capsule.id);
       if (!currentCapsule) {
@@ -912,6 +907,8 @@ export function MyCapsules() {
                         <span className="font-semibold">Mint cNFT</span>
                       </Button>
                     )}
+
+
 
                     {/* Transfer Button - Only show for capsule owners */}
                     {isCurrentOwner(capsule) && (
