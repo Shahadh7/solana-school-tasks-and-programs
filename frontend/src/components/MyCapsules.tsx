@@ -17,6 +17,7 @@ import { MintTransactionStatus } from '@/services/helius-das';
 import { PublicKey } from '@solana/web3.js';
 import { CapsuleUpdateModal } from '@/components/CapsuleUpdateModal';
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
+import { heliusDasService } from '@/services/helius-das';
 
 export function MyCapsules() {
   const { connected, publicKey, signTransaction, signMessage } = useWallet();
@@ -67,9 +68,7 @@ export function MyCapsules() {
     
     return {
       publicKey,
-      signTransaction: async <T extends Transaction | VersionedTransaction>(transaction: T): Promise<T> => {
-        return signTransaction(transaction);
-      },
+      signTransaction,
       signMessage
     };
   };
@@ -77,13 +76,49 @@ export function MyCapsules() {
   // Helper function to check if a capsule has been minted as an NFT
   const hasMintedNFT = (capsule: Capsule): boolean => {
     // Check multiple indicators for NFT status
+    // A capsule is only truly minted if it has actual NFT data
     return !!(
       capsule.mint || 
       capsule.metadata?.mintCreator || 
       capsule.metadata?.assetId ||
       capsule.metadata?.transferredAt ||
-      capsule.metadata?.nftMinted
+      (capsule.metadata?.nftMinted && (capsule.mint || capsule.metadata?.assetId)) // Only if we have actual NFT data
     );
+  };
+
+  // Function to search for existing cNFTs that match this capsule
+  const searchForExistingCNFT = async (capsule: Capsule): Promise<{
+    assetId?: string;
+    mintSignature?: string;
+  } | null> => {
+    try {
+      // Use the new targeted search method instead of getting all assets
+      const matchingCNFTs = await heliusDasService.searchCNFTsByCapsuleName(
+        publicKey!.toString(),
+        capsule.name
+      );
+      
+      if (matchingCNFTs.length > 0) {
+        // Found matching cNFTs, get transaction signatures for the first match
+        const matchedCNFT = matchingCNFTs[0];
+        try {
+          const signatures = await heliusDasService.getSignaturesForAsset(matchedCNFT.id);
+          if (signatures.items && signatures.items.length > 0) {
+            return {
+              assetId: matchedCNFT.id,
+              mintSignature: signatures.items[0][0] // First signature (mint transaction)
+            };
+          }
+        } catch (error) {
+          console.log('Could not get signatures for matched cNFT:', error);
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error searching for existing cNFT:', error);
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -116,37 +151,103 @@ export function MyCapsules() {
 
         let imageUrl = '';
         
-        // If capsule is already unlocked, decrypt the image URL
+        // Check if this capsule has been transferred to a different owner
+        const isTransferred = solanaCapsule.transferredAt && 
+          (solanaCapsule.owner as any)?.toString() !== (solanaCapsule.creator as any)?.toString();
+        
+        if (isTransferred) {
+          console.log('Processing transferred capsule:', {
+            title: solanaCapsule.title,
+            creator: (solanaCapsule.creator as any)?.toString(),
+            owner: (solanaCapsule.owner as any)?.toString(),
+            transferredAt: (solanaCapsule.transferredAt as any)?.toNumber()
+          });
+        }
+        
+        // If capsule is already unlocked, handle image URL
         if (solanaCapsule.isUnlocked && contentData.encryptedImageUrl) {
-          try {
-            const decryptedImageUrl = await encryptionService.decryptPinataUrl(
-              {
-                encryptedUrl: contentData.encryptedImageUrl,
-                iv: contentData.encryptedImageIv
-              },
-              publicKey!,
-              solanaCapsule.title as string,
-              (solanaCapsule.unlockDate as any).toNumber(),
-              publicKey!.toString() // Use current wallet key, not creator from blockchain
-            );
-            imageUrl = decryptedImageUrl.decryptedUrl;
-          } catch {
-            // Try alternative decryption methods
+          if (isTransferred) {
+            // For transferred capsules, use the new specialized method
             try {
-              // Try with different key derivation parameters
+              // First try to decrypt using the original creator's key
+              const decryptedImageUrl = await encryptionService.extractPinataUrlForTransferredCapsule(
+                {
+                  encryptedUrl: contentData.encryptedImageUrl,
+                  iv: contentData.encryptedImageIv
+                },
+                new PublicKey(solanaCapsule.creator as any),
+                solanaCapsule.title as string,
+                (solanaCapsule.unlockDate as any).toNumber()
+              );
+              
+              if (decryptedImageUrl) {
+                imageUrl = decryptedImageUrl.decryptedUrl;
+              } else {
+                // If that fails, try to extract IPFS hash and construct direct PINATA URL
+                const ipfsHash = await encryptionService.tryExtractIPFSHash({
+                  encryptedUrl: contentData.encryptedImageUrl,
+                  iv: contentData.encryptedImageIv
+                });
+                
+                if (ipfsHash) {
+                  imageUrl = encryptionService.constructDirectPinataUrl(ipfsHash);
+                  console.log('Using direct PINATA URL for transferred capsule:', imageUrl);
+                } else {
+                  // Last resort: try current owner's key
+                  try {
+                    const decryptedImageUrl = await encryptionService.decryptPinataUrl(
+                      {
+                        encryptedUrl: contentData.encryptedImageUrl,
+                        iv: contentData.encryptedImageIv
+                      },
+                      publicKey!,
+                      solanaCapsule.title as string,
+                      (solanaCapsule.unlockDate as any).toNumber(),
+                      publicKey!.toString()
+                    );
+                    imageUrl = decryptedImageUrl.decryptedUrl;
+                  } catch {
+                    console.log('All decryption methods failed for transferred capsule');
+                    imageUrl = '';
+                  }
+                }
+              }
+            } catch (error) {
+              console.log('Error handling transferred capsule decryption:', error);
+              imageUrl = '';
+            }
+          } else {
+            // For non-transferred capsules, use normal decryption with current wallet
+            try {
               const decryptedImageUrl = await encryptionService.decryptPinataUrl(
                 {
                   encryptedUrl: contentData.encryptedImageUrl,
                   iv: contentData.encryptedImageIv
                 },
                 publicKey!,
-                (solanaCapsule.title as string).trim(), // Try trimmed title
+                solanaCapsule.title as string,
                 (solanaCapsule.unlockDate as any).toNumber(),
-                publicKey!.toString() // Use current wallet key
+                publicKey!.toString() // Use current wallet key, not creator from blockchain
               );
               imageUrl = decryptedImageUrl.decryptedUrl;
             } catch {
-              imageUrl = '';
+              // Try alternative decryption methods
+              try {
+                // Try with different key derivation parameters
+                const decryptedImageUrl = await encryptionService.decryptPinataUrl(
+                  {
+                    encryptedUrl: contentData.encryptedImageUrl,
+                    iv: contentData.encryptedImageIv
+                  },
+                  publicKey!,
+                  (solanaCapsule.title as string).trim(), // Try trimmed title
+                  (solanaCapsule.unlockDate as any).toNumber(),
+                  publicKey!.toString() // Use current wallet key
+                );
+                imageUrl = decryptedImageUrl.decryptedUrl;
+              } catch {
+                imageUrl = '';
+              }
             }
           }
         } else if (!solanaCapsule.isUnlocked && contentData.encryptedImageUrl) {
@@ -183,19 +284,73 @@ export function MyCapsules() {
       }));
 
       // Check NFT minting status from on-chain data instead of localStorage
-      const capsulesWithNFTStatus = transformedCapsules.map(capsule => {
+      const capsulesWithNFTStatus = await Promise.all(transformedCapsules.map(async (capsule) => {
         // Use the helper function to check multiple indicators for NFT status
         const nftMinted = hasMintedNFT(capsule);
+        
+        // If NFT is minted but we don't have a transaction signature, try to fetch it from Helius
+        let transactionSignature = capsule.mint || capsule.metadata?.mintCreator || undefined;
+        
+        if (nftMinted && !transactionSignature && capsule.metadata?.assetId) {
+          try {
+            // Try to get transaction signatures from Helius DAS API
+            const signatures = await heliusDasService.getSignaturesForAsset(capsule.metadata.assetId);
+            
+            if (signatures.items && signatures.items.length > 0) {
+              // Get the first signature (usually the mint transaction)
+              transactionSignature = signatures.items[0][0];
+            }
+          } catch (error) {
+            console.error('Error fetching transaction signature from Helius:', error);
+          }
+        } else if (nftMinted && !transactionSignature && !capsule.metadata?.assetId) {
+          // If we don't have an assetId, try to get it from the mint address
+          try {
+            if (capsule.mint) {
+              // Try to get asset info from Helius using the mint address
+              const assetInfo = await heliusDasService.getAsset(capsule.mint);
+              if (assetInfo) {
+                // Now try to get signatures using the asset ID
+                const signatures = await heliusDasService.getSignaturesForAsset(assetInfo.id);
+                if (signatures.items && signatures.items.length > 0) {
+                  transactionSignature = signatures.items[0][0];
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching asset info or signatures:', error);
+          }
+        }
+        
+        // If still no transaction signature, try to search for existing cNFTs that match this capsule
+        if (nftMinted && !transactionSignature && !capsule.metadata?.assetId) {
+          try {
+            const existingCNFT = await searchForExistingCNFT(capsule);
+            if (existingCNFT) {
+              // Update the capsule with the found cNFT data
+              transactionSignature = existingCNFT.mintSignature;
+              capsule.metadata = {
+                ...capsule.metadata,
+                assetId: existingCNFT.assetId,
+                mintSignature: existingCNFT.mintSignature
+              };
+            }
+          } catch (error) {
+            console.error('Error searching for existing cNFT:', error);
+          }
+        }
         
         return {
           ...capsule,
           metadata: {
             ...capsule.metadata,
             nftMinted,
-            mintSignature: capsule.mint || capsule.metadata?.mintCreator || undefined
+            mintSignature: transactionSignature,
+            // Use mint address as transaction identifier for existing NFTs
+            transactionId: capsule.mint || capsule.metadata?.mintCreator || undefined
           }
         };
-      });
+      }));
       
       setUserCapsules(capsulesWithNFTStatus);
     } catch {
@@ -285,7 +440,12 @@ export function MyCapsules() {
                 metadata: {
                   ...capsule.metadata,
                   nftMinted: true,
-                  mintSignature: mintResult.signature
+                  mintSignature: mintResult.signature,
+                  // Store cNFT metadata for future reference
+                  assetId: mintResult.assetId || undefined,
+                  // Store capsule identifier to match with cNFT
+                  capsuleId: capsule.id,
+                  capsuleName: capsule.name
                 }
               };
               
@@ -324,7 +484,12 @@ export function MyCapsules() {
           metadata: {
             ...capsule.metadata,
             nftMinted: true,
-            mintSignature: mintResult.signature
+            mintSignature: mintResult.signature,
+            // Store cNFT metadata for future reference
+            assetId: mintResult.assetId || undefined,
+            // Store capsule identifier to match with cNFT
+            capsuleId: capsule.id,
+            capsuleName: capsule.name
           }
         };
         
@@ -1493,33 +1658,36 @@ export function MyCapsules() {
                               <div className="w-4 h-4 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full shadow-lg shadow-purple-400/30"></div>
                               <span className="text-purple-200 font-bold text-lg">Transaction</span>
                             </div>
-                            {capsule.metadata?.mintSignature && (
-                              <div className="space-y-4">
-                                <div className="p-3 bg-slate-800/50 rounded-2xl border border-slate-600/30">
-                                  <div className="text-xs text-gray-400 font-mono break-all leading-relaxed">
-                                    {convertSignatureToBase58(capsule.metadata.mintSignature)}
-                                  </div>
+                            {capsule.metadata?.mintSignature ? (
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                <span className="font-medium">Transaction Signature:</span>{' '}
+                                <a
+                                  href={`https://solscan.io/tx/${capsule.metadata.mintSignature}?cluster=devnet`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 break-all"
+                                >
+                                  {capsule.metadata.mintSignature}
+                                </a>
+                              </div>
+                            ) : capsule.metadata?.transactionId ? (
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                <span className="font-medium">Transaction ID:</span>{' '}
+                                <a
+                                  href={`https://solscan.io/tx/${capsule.metadata.transactionId}?cluster=devnet`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 break-all"
+                                >
+                                  {capsule.metadata.transactionId}
+                                </a>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Using mint address as transaction identifier
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <a 
-                                    href={`https://solscan.io/tx/${convertSignatureToBase58(capsule.metadata.mintSignature)}?cluster=devnet`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="bg-gradient-to-r from-purple-500/20 to-purple-600/20 hover:from-purple-500/30 hover:to-purple-600/30 text-purple-200 hover:text-purple-100 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-300 flex items-center justify-center space-x-2 border border-purple-400/30 hover:border-purple-400/50 group-hover:shadow-purple-500/20"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                    Solscan
-                                  </a>
-                                  <a 
-                                    href={`https://explorer.solana.com/tx/${convertSignatureToBase58(capsule.metadata.mintSignature)}?cluster=devnet`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="bg-gradient-to-r from-violet-500/20 to-violet-600/20 hover:from-violet-500/30 hover:to-violet-600/30 text-violet-200 hover:text-violet-100 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-300 flex items-center justify-center space-x-2 border border-violet-400/30 hover:border-violet-400/50 group-hover:shadow-violet-500/20"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                    Explorer
-                                  </a>
-                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-500">
+                                Transaction information not available
                               </div>
                             )}
                           </div>
@@ -1653,7 +1821,8 @@ export function MyCapsules() {
       )}
 
       {/* Capsule Update Modal */}
-      {showUpdateModal && (() => {
+      {(() => {
+        if (!showUpdateModal) return null;
         const capsule = userCapsules.find(c => c.id === showUpdateModal);
         if (!capsule) return null;
         

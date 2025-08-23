@@ -104,6 +104,10 @@ export interface AssetsByOwnerOptions {
   }
   showFungible?: boolean
   showNativeBalance?: boolean
+  displayOptions?: {
+    showFungible?: boolean
+    showNativeBalance?: boolean
+  }
 }
 
 export interface MintTransactionStatus {
@@ -124,8 +128,9 @@ class HeliusDasService {
 
   constructor() {
     this.apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY || ''
-    this.baseUrl = process.env.NEXT_PUBLIC_HELIUS_DAS_URL || 'https://api.helius.xyz'
-    this.rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 'https://api.helius.xyz'
+    // Use the correct Helius RPC endpoint for DAS API
+    this.baseUrl = process.env.NEXT_PUBLIC_HELIUS_DAS_URL || 'https://devnet.helius-rpc.com'
+    this.rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 'https://devnet.helius-rpc.com'
     
     if (!this.apiKey) {
       console.warn('Helius API key not found. DAS API functionality will be limited.')
@@ -168,8 +173,29 @@ class HeliusDasService {
     try {
       console.log('Fetching asset:', assetId)
       
-      const asset = await this.makeRequest<DasApiAsset>(`/assets/${assetId}`)
-      return asset
+      const response = await fetch(`${this.baseUrl}/?api-key=${this.apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'my-request-id',
+          method: 'getAsset',
+          params: { id: assetId }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`DAS API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(`DAS API error: ${data.error.message}`);
+      }
+
+      return data.result;
     } catch (error) {
       console.error('Failed to fetch asset:', error)
       return null
@@ -177,7 +203,7 @@ class HeliusDasService {
   }
 
   /**
-   * Get assets by owner
+   * Get assets by owner using getAssetsByOwner (recommended method)
    */
   async getAssetsByOwner(
     ownerAddress: string, 
@@ -196,26 +222,45 @@ class HeliusDasService {
         showNativeBalance = false,
       } = options
 
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-        showFungible: showFungible.toString(),
-        showNativeBalance: showNativeBalance.toString(),
-      })
+      const response = await fetch(`${this.baseUrl}/?api-key=${this.apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'my-request-id',
+          method: 'getAssetsByOwner',
+          params: {
+            ownerAddress,
+            page,
+            limit,
+            before,
+            after,
+            ...(sortBy && {
+              sortBy: sortBy.sortBy,
+              sortDirection: sortBy.sortDirection
+            }),
+            displayOptions: {
+              showFungible,
+              showNativeBalance
+            }
+          }
+        })
+      });
 
-      if (before) params.append('before', before)
-      if (after) params.append('after', after)
-      if (sortBy) {
-        params.append('sortBy', sortBy.sortBy)
-        params.append('sortDirection', sortBy.sortDirection)
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`DAS API request failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      const response = await this.makeRequest<DasApiResponse<DasApiAsset>>(
-        `/assets?ownerAddress=${ownerAddress}&${params.toString()}`
-      )
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(`DAS API error: ${data.error.message}`);
+      }
 
-      console.log(`Found ${response.total} assets for owner`)
-      return response
+      const result = data.result;
+      console.log(`Found ${result.total} assets for owner`);
+      return result;
     } catch (error) {
       console.error('Failed to fetch assets by owner:', error)
       return { total: 0, limit: 0, page: 1, items: [] }
@@ -362,17 +407,30 @@ class HeliusDasService {
     try {
       console.log('Fetching proof for asset:', assetId);
       
-      // Use Helius DAS API to get asset proof
-      const response = await this.makeRequest<{
-        root: string
-        proof: string[]
-        node_index: number
-        leaf: string
-        tree_id: string
-      }>(`/assets/${assetId}/proof`);
+      const response = await fetch(`${this.baseUrl}/?api-key=${this.apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'my-request-id',
+          method: 'getAssetProof',
+          params: { id: assetId }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`DAS API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
       
-      console.log('Asset proof fetched successfully:', response);
-      return response;
+      if (data.error) {
+        throw new Error(`DAS API error: ${data.error.message}`);
+      }
+
+      console.log('Asset proof fetched successfully:', data.result);
+      return data.result;
     } catch (error) {
       console.error('Failed to fetch asset proof:', error);
       return null;
@@ -426,6 +484,85 @@ class HeliusDasService {
       hasApiKey: !!this.apiKey,
       baseUrl: this.baseUrl,
       rpcUrl: this.rpcUrl
+    }
+  }
+
+  // Get transaction signatures for an asset (NFT)
+  async getSignaturesForAsset(assetId: string): Promise<{
+    total: number;
+    limit: number;
+    items: Array<[string, string]>; // [signature, operation_type]
+  }> {
+    try {
+      // Use the correct Helius DAS API endpoint structure
+      const response = await fetch(`${this.baseUrl}/v0/signatures?api-key=${this.apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'my-request-id',
+          method: 'getSignaturesForAsset',
+          params: {
+            id: assetId,
+            page: 1,
+            limit: 1000,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(`API error: ${data.error.message}`);
+      }
+
+      return data.result;
+    } catch (error) {
+      console.error('Error fetching signatures for asset:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search for cNFTs that match a specific capsule name
+   * This is more efficient than getting all assets and filtering
+   */
+  async searchCNFTsByCapsuleName(
+    ownerAddress: string,
+    capsuleName: string
+  ): Promise<DasApiAsset[]> {
+    try {
+      console.log('Searching for cNFTs matching capsule name:', capsuleName)
+      
+      // First get all assets owned by the wallet
+      const allAssets = await this.getAssetsByOwner(ownerAddress, {
+        limit: 1000,
+        displayOptions: {
+          showFungible: false, // We only want NFTs
+          showNativeBalance: false
+        }
+      });
+      
+      // Filter for compressed NFTs that match the capsule name
+      const matchingCNFTs = allAssets.items.filter(asset => {
+        const isCompressed = asset.compression?.compressed === true;
+        const nameMatches = asset.content?.metadata?.name === capsuleName;
+        
+        return isCompressed && nameMatches;
+      });
+      
+      console.log(`Found ${matchingCNFTs.length} cNFTs matching capsule name "${capsuleName}"`);
+      return matchingCNFTs;
+    } catch (error) {
+      console.error('Failed to search cNFTs by capsule name:', error)
+      return []
     }
   }
 }

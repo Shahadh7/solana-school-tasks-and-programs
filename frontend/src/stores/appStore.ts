@@ -24,6 +24,9 @@ export interface Capsule {
     transferredAt?: number
     mintCreator?: string
     treeAddress?: string
+    transactionId?: string
+    capsuleId?: string
+    capsuleName?: string
   }
 }
 

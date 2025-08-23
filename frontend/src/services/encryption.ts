@@ -132,6 +132,79 @@ class EncryptionService {
   }
 
   /**
+   * Try to extract PINATA URL from encrypted data for transferred capsules
+   * This is a fallback when decryption fails but we need to show the image
+   */
+  async extractPinataUrlForTransferredCapsule(
+    encryptedData: EncryptedData,
+    originalCreatorKey: PublicKey,
+    title: string,
+    unlockDate: number
+  ): Promise<DecryptedData | null> {
+    try {
+      // Try to decrypt using the original creator's key
+      const key = await this.deriveSecretKey(originalCreatorKey, title, unlockDate, originalCreatorKey.toString());
+      
+      // Convert from base64 strings
+      const encryptedBuffer = Uint8Array.from(atob(encryptedData.encryptedUrl), c => c.charCodeAt(0));
+      const iv = Uint8Array.from(atob(encryptedData.iv), c => c.charCodeAt(0));
+      
+      // Decrypt the URL
+      const decryptedBuffer = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        encryptedBuffer
+      );
+      
+      // Convert back to string
+      const decoder = new TextDecoder();
+      const decryptedUrl = decoder.decode(decryptedBuffer);
+      
+      return {
+        decryptedUrl
+      };
+    } catch (error) {
+      console.log('Failed to decrypt with original creator key for transferred capsule:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Construct a direct PINATA URL from IPFS hash
+   * This is used when decryption fails but we know the IPFS hash
+   */
+  constructDirectPinataUrl(ipfsHash: string): string {
+    return `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+  }
+
+  /**
+   * Try to extract IPFS hash from encrypted data
+   * This is a last resort when we can't decrypt but need to show something
+   */
+  async tryExtractIPFSHash(encryptedData: EncryptedData): Promise<string | null> {
+    try {
+      // Try to decode the encrypted data to see if it contains an IPFS hash
+      // This is a heuristic approach and may not always work
+      const encryptedBuffer = Uint8Array.from(atob(encryptedData.encryptedUrl), c => c.charCodeAt(0));
+      
+      // Look for common IPFS hash patterns in the encrypted data
+      const decoder = new TextDecoder();
+      const encryptedText = decoder.decode(encryptedBuffer);
+      
+      // Try to find IPFS hash patterns (Qm... or bafy...)
+      const ipfsHashMatch = encryptedText.match(/(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[a-z2-7]{55})/);
+      if (ipfsHashMatch) {
+        return ipfsHashMatch[1];
+      }
+      
+      return null;
+    } catch (error) {
+      console.log('Failed to extract IPFS hash from encrypted data:', error);
+      return null;
+    }
+  }
+
+  /**
    * Generate a deterministic hash for capsule identification
    */
   async generateCapsuleHash(
