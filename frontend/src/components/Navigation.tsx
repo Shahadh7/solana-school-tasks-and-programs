@@ -8,7 +8,6 @@ export function Navigation() {
   const { connected, publicKey } = useWallet();
   const [mounted, setMounted] = useState(false);
 
-  // Ensure component only shows wallet-specific content after hydration
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -36,14 +35,11 @@ export function Navigation() {
             </div>
           </div>
 
-          {/* Wallet Connection Area */}
           <div className="flex items-center flex-shrink-0 ml-2">
             {!mounted ? (
-              // Show loading state during hydration to prevent mismatch
               <div className="h-10 w-32 bg-gray-800/50 rounded-lg animate-pulse"></div>
             ) : connected && publicKey ? (
               <div className="flex items-center space-x-2 md:space-x-4">
-                {/* Hide wallet address display on mobile, only show on larger screens */}
                 <div className="relative hidden lg:block">
                   <div className="absolute -inset-4 bg-gradient-to-r from-amber-400/20 to-yellow-500/20 rounded-2xl blur-lg"></div>
                   <div className="relative bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl px-3 md:px-4 py-2 md:py-3">

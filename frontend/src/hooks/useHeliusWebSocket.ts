@@ -104,7 +104,6 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
     onUpdate?: (status: TransactionStatus) => void
   ): Promise<boolean> => {
     try {
-      // Set initial status
       const initialStatus: TransactionStatus = {
         signature,
         status: 'pending',
@@ -128,7 +127,6 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
           setTransactionStatuses(prev => new Map(prev.set(signature, newStatus)));
           onUpdate?.(newStatus);
           
-          // Auto-cleanup after confirmation
           setTimeout(() => {
             setTransactionStatuses(prev => {
               const newMap = new Map(prev);
@@ -164,7 +162,6 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
   ): Promise<string | null> => {
     try {
       const subscriptionKey = await heliusWebSocket.subscribeToSlotChanges((slotInfo) => {
-        // Handle different slot info formats
         let slot: number;
         if (typeof slotInfo === 'object' && slotInfo !== null && 'slot' in slotInfo) {
           slot = (slotInfo as { slot: number }).slot;
@@ -179,7 +176,6 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
         callback?.(slot);
       });
       
-      // Only set subscription if it's not disabled
       if (subscriptionKey && subscriptionKey !== 'slot-change-disabled') {
         subscriptionsRef.current.set('slot-changes', subscriptionKey);
       }
@@ -219,7 +215,6 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
    * Cleanup all subscriptions
    */
   const cleanup = useCallback(async () => {
-    // Cleanup WebSocket subscriptions
     const subscriptions = Array.from(subscriptionsRef.current.entries());
     for (const [key, subscriptionKey] of subscriptions) {
       if (key.startsWith('account-')) {
@@ -229,7 +224,6 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
       }
     }
     
-    // Remove event listeners
     const listeners = Array.from(eventListenersRef.current.keys());
     for (const eventType of listeners) {
       removeEventListener(eventType);
@@ -241,37 +235,31 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
     updateStatus();
   }, [removeEventListener, updateStatus]);
 
-  // Initialize status on mount
   useEffect(() => {
     updateStatus();
     
-    // Auto-subscribe to slot changes if enabled
     if (options.enableSlotTracking) {
       subscribeToSlots().catch((error) => {
         console.warn('Could not enable slot tracking:', error);
       });
     }
     
-    // Cleanup on unmount
     return () => {
       cleanup();
     };
   }, [options.enableSlotTracking, subscribeToSlots, cleanup, updateStatus]);
 
-  // Update status periodically
   useEffect(() => {
     const interval = setInterval(updateStatus, 5000);
     return () => clearInterval(interval);
   }, [updateStatus]);
 
   return {
-    // Status
     status,
     currentSlot,
     accountUpdates: Object.fromEntries(accountUpdates),
     transactionStatuses: Object.fromEntries(transactionStatuses),
     
-    // Actions
     subscribeToAccount,
     unsubscribeFromAccount,
     monitorTransaction,
@@ -280,7 +268,6 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
     removeEventListener,
     cleanup,
     
-    // Helpers
     isConnected: status?.isConnected || false,
     totalSubscriptions: status ? status.subscriptions.accounts + status.subscriptions.transactions + status.subscriptions.programs : 0
   };

@@ -38,22 +38,22 @@ export function MyCapsules() {
   const [showFullscreenImage, setShowFullscreenImage] = useState<string | null>(null);
   const [showUpdateModal, setShowUpdateModal] = useState<string | null>(null);
 
-  // Utility function to convert signature to base58 format
+  
   const convertSignatureToBase58 = (signature: unknown): string => {
     try {
       if (typeof signature === 'string') {
-        // Already a string, check if it looks like base58 or byte array string
+        
         if (signature.includes(',')) {
-          // It's a comma-separated byte array string
+          
           const bytes = signature.split(',').map(num => parseInt(num.trim(), 10));
           return bs58.encode(new Uint8Array(bytes));
         }
-        return signature; // Already base58
+        return signature; 
       } else if (Array.isArray(signature)) {
-        // It's a byte array
+        
         return bs58.encode(new Uint8Array(signature));
       } else if (signature instanceof Uint8Array) {
-        // It's already a Uint8Array
+        
         return bs58.encode(signature);
       }
       return String(signature);
@@ -62,7 +62,7 @@ export function MyCapsules() {
     }
   };
 
-  // Create a type-safe wallet wrapper for solanaService calls
+  
   const createWalletWrapper = () => {
     if (!publicKey || !signTransaction || !signMessage) return null;
     
@@ -73,17 +73,17 @@ export function MyCapsules() {
     };
   };
 
-  // Helper function to check if a capsule has been minted as an NFT
+  
   const hasMintedNFT = (capsule: Capsule): boolean => {
-    // Check multiple indicators for NFT status
-    // A capsule is only truly minted if it has actual NFT data
+    
+    
     const result = !!(
       capsule.mint || 
       capsule.metadata?.mintCreator || 
       capsule.metadata?.assetId ||
       capsule.metadata?.transferredAt ||
       capsule.metadata?.mintSignature ||
-      (capsule.metadata?.nftMinted && (capsule.mint || capsule.metadata?.assetId || capsule.metadata?.mintSignature)) // Only if we have actual NFT data
+      (capsule.metadata?.nftMinted && (capsule.mint || capsule.metadata?.assetId || capsule.metadata?.mintSignature)) 
     );
     
     if (process.env.NODE_ENV === 'development') {
@@ -101,27 +101,27 @@ export function MyCapsules() {
     return result;
   };
 
-  // Function to search for existing cNFTs that match this capsule
+  
   const searchForExistingCNFT = async (capsule: Capsule): Promise<{
     assetId?: string;
     mintSignature?: string;
   } | null> => {
     try {
-      // Use the new targeted search method instead of getting all assets
+      
       const matchingCNFTs = await heliusDasService.searchCNFTsByCapsuleName(
         publicKey!.toString(),
         capsule.name
       );
       
       if (matchingCNFTs.length > 0) {
-        // Found matching cNFTs, get transaction signatures for the first match
+        
         const matchedCNFT = matchingCNFTs[0];
         try {
           const signatures = await heliusDasService.getSignaturesForAsset(matchedCNFT.id);
           if (signatures.items && signatures.items.length > 0) {
             return {
               assetId: matchedCNFT.id,
-              mintSignature: signatures.items[0][0] // First signature (mint transaction)
+              mintSignature: signatures.items[0][0] 
             };
           }
         } catch (error) {
@@ -140,7 +140,7 @@ export function MyCapsules() {
     if (connected && publicKey) {
       loadUserCapsules();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [connected, publicKey]);
 
   const loadUserCapsules = async () => {
@@ -148,14 +148,14 @@ export function MyCapsules() {
     
     setLoading(true);
     try {
-      // Create a type-safe wallet wrapper
+      
       const walletWrapper = createWalletWrapper();
       if (!walletWrapper) return;
 
-      // Fetch real capsules from Solana
+      
       const solanaCapsules = await solanaService.getWalletCapsules(walletWrapper);
 
-      // Transform Solana data to our app format
+      
       const transformedCapsules: Capsule[] = await Promise.all(solanaCapsules.map(async (solanaCapsule: Record<string, unknown>) => {
         let contentData;
         try {
@@ -166,7 +166,7 @@ export function MyCapsules() {
 
         let imageUrl = '';
         
-        // Check if this capsule has been transferred to a different owner
+        
         const isTransferred = solanaCapsule.transferredAt && 
           (solanaCapsule.owner as any)?.toString() !== (solanaCapsule.creator as any)?.toString();
         
@@ -179,12 +179,12 @@ export function MyCapsules() {
           });
         }
         
-        // If capsule is already unlocked, handle image URL
+        
         if (solanaCapsule.isUnlocked && contentData.encryptedImageUrl) {
           if (isTransferred) {
-            // For transferred capsules, use the new specialized method
+            
             try {
-              // First try to decrypt using the original creator's key
+              
               const decryptedImageUrl = await encryptionService.extractPinataUrlForTransferredCapsule(
                 {
                   encryptedUrl: contentData.encryptedImageUrl,
@@ -198,7 +198,7 @@ export function MyCapsules() {
               if (decryptedImageUrl) {
                 imageUrl = decryptedImageUrl.decryptedUrl;
               } else {
-                // If that fails, try to extract IPFS hash and construct direct PINATA URL
+                
                 const ipfsHash = await encryptionService.tryExtractIPFSHash({
                   encryptedUrl: contentData.encryptedImageUrl,
                   iv: contentData.encryptedImageIv
@@ -208,7 +208,7 @@ export function MyCapsules() {
                   imageUrl = encryptionService.constructDirectPinataUrl(ipfsHash);
                   console.log('Using direct PINATA URL for transferred capsule:', imageUrl);
                 } else {
-                  // Last resort: try current owner's key
+                  
                   try {
                     const decryptedImageUrl = await encryptionService.decryptPinataUrl(
                       {
@@ -232,7 +232,7 @@ export function MyCapsules() {
               imageUrl = '';
             }
           } else {
-            // For non-transferred capsules, use normal decryption with current wallet
+            
             try {
               const decryptedImageUrl = await encryptionService.decryptPinataUrl(
                 {
@@ -242,22 +242,22 @@ export function MyCapsules() {
                 publicKey!,
                 solanaCapsule.title as string,
                 (solanaCapsule.unlockDate as any).toNumber(),
-                publicKey!.toString() // Use current wallet key, not creator from blockchain
+                publicKey!.toString() 
               );
               imageUrl = decryptedImageUrl.decryptedUrl;
             } catch {
-              // Try alternative decryption methods
+              
               try {
-                // Try with different key derivation parameters
+                
                 const decryptedImageUrl = await encryptionService.decryptPinataUrl(
                   {
                     encryptedUrl: contentData.encryptedImageUrl,
                     iv: contentData.encryptedImageIv
                   },
                   publicKey!,
-                  (solanaCapsule.title as string).trim(), // Try trimmed title
+                  (solanaCapsule.title as string).trim(), 
                   (solanaCapsule.unlockDate as any).toNumber(),
-                  publicKey!.toString() // Use current wallet key
+                  publicKey!.toString() 
                 );
                 imageUrl = decryptedImageUrl.decryptedUrl;
               } catch {
@@ -266,10 +266,10 @@ export function MyCapsules() {
             }
           }
         } else if (!solanaCapsule.isUnlocked && contentData.encryptedImageUrl) {
-          // Check if capsule is ready to be unlocked (time has passed)
+          
           const currentTime = Math.floor(Date.now() / 1000);
           if ((solanaCapsule.unlockDate as any).toNumber() <= currentTime) {
-            // The unlock button will be shown to the user
+            
           }
         }
 
@@ -281,7 +281,7 @@ export function MyCapsules() {
           imageUrl: imageUrl,
           unlockDate: new Date((solanaCapsule.unlockDate as any).toNumber() * 1000),
           createdAt: new Date((solanaCapsule.createdAt as any).toNumber() * 1000),
-          owner: (solanaCapsule.owner as any)?.toString() || (solanaCapsule.creator as any).toString(), // Use owner if available, fallback to creator
+          owner: (solanaCapsule.owner as any)?.toString() || (solanaCapsule.creator as any).toString(), 
           isLocked: !solanaCapsule.isUnlocked,
           metadata: {
             attributes: [
@@ -298,25 +298,25 @@ export function MyCapsules() {
         return capsule;
       }));
 
-      // Check NFT minting status from on-chain data instead of localStorage
+      
       const capsulesWithNFTStatus = await Promise.all(transformedCapsules.map(async (capsule) => {
-        // Start with what we have from the blockchain
+        
         let transactionSignature = capsule.mint || capsule.metadata?.mintCreator || undefined;
         let updatedCapsule = { ...capsule };
         
-        // First, try to populate missing NFT metadata if we have a mint address
+        
         if (updatedCapsule.mint && !updatedCapsule.metadata?.assetId) {
           try {
-            // Try to get asset info from Helius using the mint address
+            
             const assetInfo = await heliusDasService.getAsset(updatedCapsule.mint);
             if (assetInfo) {
-              // Update the capsule with the found asset ID
+              
               updatedCapsule.metadata = {
                 ...updatedCapsule.metadata,
                 assetId: assetInfo.id
               };
               
-              // Try to get signatures using the asset ID
+              
               try {
                 const signatures = await heliusDasService.getSignaturesForAsset(assetInfo.id);
                 if (signatures.items && signatures.items.length > 0) {
@@ -335,7 +335,7 @@ export function MyCapsules() {
           }
         }
         
-        // If we have assetId but no signature, try to get signatures
+        
         if (updatedCapsule.metadata?.assetId && !transactionSignature) {
           try {
             const signatures = await heliusDasService.getSignaturesForAsset(updatedCapsule.metadata.assetId);
@@ -351,12 +351,12 @@ export function MyCapsules() {
           }
         }
         
-        // If we still don't have NFT data, try to search for existing cNFTs that match this capsule
+        
         if (!updatedCapsule.metadata?.assetId && !transactionSignature) {
           try {
             const existingCNFT = await searchForExistingCNFT(updatedCapsule);
             if (existingCNFT) {
-              // Update the capsule with the found cNFT data
+              
               transactionSignature = existingCNFT.mintSignature;
               updatedCapsule.metadata = {
                 ...updatedCapsule.metadata,
@@ -369,11 +369,11 @@ export function MyCapsules() {
           }
         }
         
-        // NOW determine NFT minting status after we've populated all available metadata
+        
         const nftMinted = hasMintedNFT(updatedCapsule);
         
-        // Additional check: If we have a mint address but nftMinted is false, 
-        // it might be an edge case where the mint exists but metadata isn't populated
+        
+        
         let finalNftMinted = nftMinted;
         if (!nftMinted && updatedCapsule.mint) {
           console.warn(`⚠️ Capsule ${updatedCapsule.name} has mint address but nftMinted is false. Treating as minted.`);
@@ -395,7 +395,7 @@ export function MyCapsules() {
             ...updatedCapsule.metadata,
             nftMinted: finalNftMinted,
             mintSignature: transactionSignature,
-            // Use mint address as transaction identifier for existing NFTs
+            
             transactionId: updatedCapsule.mint || updatedCapsule.metadata?.mintCreator || undefined
           }
         };
@@ -423,7 +423,7 @@ export function MyCapsules() {
     alert('Share link copied to clipboard!');
   };
 
-  // Removed unused function - transfer functionality is handled by handleTransferNFT
+  
 
   const handleMintNFT = async (capsule: Capsule) => {
     if (!publicKey || !signTransaction || !signMessage) {
@@ -431,7 +431,7 @@ export function MyCapsules() {
       return;
     }
 
-    // Check if capsule is unlocked
+    
     const isUnlocked = new Date() >= capsule.unlockDate;
     if (!isUnlocked) {
       alert('This capsule cannot be minted as NFT until it is unlocked!');
@@ -443,7 +443,7 @@ export function MyCapsules() {
     setMintStatus('Starting mint process...');
 
     try {
-      // Create a fake image file for minting (in real app, you'd have the original image)
+      
       const response = await fetch(capsule.imageUrl);
       const blob = await response.blob();
       const imageFile = new File([blob], `${capsule.name}.jpg`, { type: 'image/jpeg' });
@@ -452,7 +452,7 @@ export function MyCapsules() {
         useCompressedNFT: mintAsCompressed,
       };
 
-      // Monitor transaction with WebSocket
+      
       const mintResult = await nftService.mintCapsule(
         {
           publicKey,
@@ -473,23 +473,23 @@ export function MyCapsules() {
         mintOptions
       );
 
-      // Immediately update the UI to show NFT as minted (optimistic update)
+      
       const updatedCapsuleData = {
         ...capsule,
-        mint: mintResult.signature, // Use signature as the mint identifier
+        mint: mintResult.signature, 
         metadata: {
           ...capsule.metadata,
           nftMinted: true,
           mintSignature: mintResult.signature,
-          // Store cNFT metadata for future reference
+          
           assetId: mintResult.assetId || undefined,
-          // Store capsule identifier to match with cNFT
+          
           capsuleId: capsule.id,
           capsuleName: capsule.name
         }
       };
       
-      // Update the state immediately to hide the mint button
+      
       console.log('🎯 Updating capsule state immediately after mint:', {
         capsuleId: capsule.id,
         nftMinted: updatedCapsuleData.metadata.nftMinted,
@@ -500,12 +500,12 @@ export function MyCapsules() {
       });
       updateCapsule(capsule.id, updatedCapsuleData);
       
-      // Force a UI update by triggering a state change
+      
       setTimeout(() => {
         console.log('🔄 Forcing UI refresh after state update');
       }, 100);
 
-      // Set up real-time transaction monitoring with toast notifications
+      
       if (mintAsCompressed) {
         toast.promise(
           cnftService.monitorMintTransaction(mintResult.signature, (status: MintTransactionStatus) => {
@@ -514,31 +514,31 @@ export function MyCapsules() {
               setMintStatus('✅ cNFT minted successfully!');
               setMintProgress(100);
               
-              // Ensure the capsule data is updated with confirmed status
+              
               const confirmedCapsule = {
                 ...updatedCapsuleData,
                 metadata: {
                   ...updatedCapsuleData.metadata,
-                  nftMinted: true, // Ensure this is explicitly set
-                  confirmed: true, // Add confirmation flag
+                  nftMinted: true, 
+                  confirmed: true, 
                 }
               };
               
               updateCapsule(capsule.id, confirmedCapsule);
               
-              // Force reload capsules to ensure UI updates and get fresh on-chain data
+              
               setTimeout(() => {
                 loadUserCapsules();
-              }, 2000); // Increased delay to ensure transaction is fully confirmed
+              }, 2000); 
             } else if (status.status === 'failed') {
               setMintStatus(`❌ Minting failed: ${status.error}`);
               
-              // Revert the optimistic update on failure
+              
               const revertedCapsule = {
                 ...capsule,
                 metadata: {
                   ...capsule.metadata,
-                  nftMinted: false, // Revert the minted status
+                  nftMinted: false, 
                 }
               };
               updateCapsule(capsule.id, revertedCapsule);
@@ -559,7 +559,7 @@ export function MyCapsules() {
         setMintProgress(100);
         toast.success('🎉 NFT minted successfully!');
         
-        // For regular NFTs, reload after a short delay
+        
         setTimeout(() => {
           loadUserCapsules();
         }, 1500);
@@ -568,7 +568,7 @@ export function MyCapsules() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      // Revert the optimistic update on error
+      
       const revertedCapsule = {
         ...capsule,
         metadata: {
@@ -587,27 +587,27 @@ export function MyCapsules() {
         setMintProgress(0);
         setMintStatus('');
         setShowMintDialog(null);
-      }, 3000); // Clear after 3 seconds
+      }, 3000); 
     }
   };
 
-  // Helper function to check if capsule has an associated CNFT
+  
   const hasAssociatedCNFT = (capsule: Capsule): boolean => {
     return !!(capsule.mint && capsule.metadata?.assetId);
   };
 
-  // Helper function to check if current user is the capsule owner
+  
   const isCurrentOwner = (capsule: Capsule): boolean => {
     return capsule.owner === publicKey?.toString();
   };
 
-  // Helper function to get transfer button text and state
+  
   const getTransferButtonInfo = (capsule: Capsule): { text: string; canTransfer: boolean; transferType: 'capsule' | 'cnft' | 'both' | 'none' | 'cnft-only' } => {
     const isOwner = isCurrentOwner(capsule);
     const hasCNFT = hasAssociatedCNFT(capsule);
     
     if (!isOwner) {
-      // Check if this is a transferred capsule with CNFT
+      
       if (hasCNFT) {
         return { text: 'Transfer cNFT', canTransfer: true, transferType: 'cnft-only' };
       }
@@ -621,7 +621,7 @@ export function MyCapsules() {
     return { text: 'Transfer Capsule', canTransfer: true, transferType: 'capsule' };
   };
 
-  // Helper function to get transfer button text for display
+  
   const getTransferButtonText = (capsule: Capsule): string => {
     const { text } = getTransferButtonInfo(capsule);
     return text;
@@ -630,16 +630,16 @@ export function MyCapsules() {
   const handleTransferNFT = async (capsule: Capsule) => {
     if (!publicKey || !signTransaction || !signMessage) return;
 
-    // Check if this is a CNFT-only transfer (transferred capsule)
+    
     const isTransferredCapsule = !isCurrentOwner(capsule) && hasAssociatedCNFT(capsule);
     
     if (isTransferredCapsule) {
-      // Handle CNFT-only transfer
+      
       await handleCNFTOnlyTransfer(capsule);
       return;
     }
 
-    // Validate that the current user is the capsule owner
+    
     if (capsule.owner !== publicKey.toString()) {
       toast.error('Only the capsule owner can transfer this capsule');
       return;
@@ -670,29 +670,29 @@ export function MyCapsules() {
         transferType: transferCNFT ? 'capsule-and-cnft' : 'capsule-only'
       });
 
-      // Transfer the capsule using the Solana service
+      
       const transferResult = await solanaService.transferCapsule(
         createWalletWrapper()!,
         capsule.id,
         cleanAddress
       );
 
-      // If CNFT transfer is requested and the capsule has a mint address
+      
       if (transferCNFT && capsule.mint && capsule.metadata?.assetId) {
         try {
           toast.loading('Transferring CNFT...', { id: 'cnft-transfer' });
           
-          // Initialize CNFT service with the wallet
+          
           await cnftService.initialize({
             publicKey,
             signTransaction: signTransaction!,
             signMessage: signMessage!
           });
 
-          // Transfer the CNFT
+          
           const cnftTransferSignature = await cnftService.transferCNFT({
             assetId: capsule.metadata.assetId,
-            newOwner: cleanAddress, // Pass as string, CNFT service will convert
+            newOwner: cleanAddress, 
           });
 
           console.log('CNFT transfer successful:', cnftTransferSignature);
@@ -700,20 +700,20 @@ export function MyCapsules() {
         } catch (cnftError) {
           console.error('CNFT transfer failed:', cnftError);
           toast.error(`CNFT transfer failed: ${cnftError instanceof Error ? cnftError.message : 'Unknown error'}`, { id: 'cnft-transfer' });
-          // Note: Capsule transfer was successful, but CNFT transfer failed
+          
         }
       } else if (transferCNFT && (!capsule.mint || !capsule.metadata?.assetId)) {
-        // User requested CNFT transfer but capsule doesn't have associated CNFT
+        
         toast.error('⚠️ CNFT transfer requested but this capsule has no associated compressed NFT', { id: 'cnft-transfer' });
       }
 
       toast.success('🎉 Capsule transferred successfully!', { id: 'transfer' });
 
-      // Remove the capsule from current user's list since it's been transferred
+      
       const updatedCapsules = userCapsules.filter((c: Capsule) => c.id !== capsule.id);
       setUserCapsules(updatedCapsules);
       
-      // Reload capsules to ensure UI is up to date
+      
       setTimeout(() => {
         loadUserCapsules();
       }, 1000);
@@ -757,24 +757,24 @@ export function MyCapsules() {
         toAddress: cleanAddress,
       });
 
-      // Initialize CNFT service with the wallet
+      
       await cnftService.initialize({
         publicKey,
         signTransaction: signTransaction!,
         signMessage: signMessage!
       });
 
-      // Transfer the CNFT
+      
       const cnftTransferSignature = await cnftService.transferCNFT({
         assetId: capsule.metadata.assetId!,
-        newOwner: cleanAddress, // Pass as string, CNFT service will convert
+        newOwner: cleanAddress, 
       });
 
       console.log('CNFT transfer successful:', cnftTransferSignature);
       toast.success('🎉 CNFT transferred successfully!', { id: 'cnft-transfer' });
 
-      // Note: Capsule ownership remains unchanged for CNFT-only transfers
-      // Just close the dialog and show success message
+      
+      
 
     } catch (error) {
       console.error('CNFT-only transfer error details:', error);
@@ -794,15 +794,15 @@ export function MyCapsules() {
     setUnlockingCapsule(capsule.id);
     try {
       if (capsule.isLocked) {
-        // Unlock the capsule on Solana
+        
         await solanaService.unlockCapsule(
           createWalletWrapper()!,
           capsule.id
         );
       }
 
-      // Get the encrypted data from the capsule content
-      // We need to fetch the capsule data again to get the encrypted content
+      
+      
       const walletWrapper = createWalletWrapper();
       if (!walletWrapper) return;
       
@@ -830,18 +830,18 @@ export function MyCapsules() {
         publicKey,
         capsule.name,
         Math.floor(capsule.unlockDate.getTime() / 1000),
-        publicKey.toString() // Use current wallet key
+        publicKey.toString() 
       );
 
 
 
-      // Update the capsule in our store
+      
       updateCapsule(capsule.id, {
         isLocked: false,
         imageUrl: decryptedImageUrl.decryptedUrl
       });
 
-      // Reload capsules to get fresh data
+      
       await loadUserCapsules();
 
     } catch {
@@ -940,7 +940,6 @@ export function MyCapsules() {
             key={capsule.id}
             className="group relative bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-700 transform hover:-translate-y-3 border border-amber-400/30 backdrop-blur-xl overflow-hidden hover:border-amber-400/60"
           >
-            {/* Status Badge */}
             <div className="absolute top-4 right-4 z-10">
               {capsule.isLocked ? (
                 isUnlocked(capsule.unlockDate) ? (
@@ -962,7 +961,6 @@ export function MyCapsules() {
               )}
             </div>
 
-            {/* NFT Badge */}
             {hasMintedNFT(capsule) && (
               <div className="absolute top-4 left-4 z-10">
                 <div className="flex items-center gap-1 bg-gradient-to-r from-purple-500 to-violet-600 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
@@ -972,11 +970,9 @@ export function MyCapsules() {
               </div>
             )}
 
-            {/* Gradient Overlay Effect */}
             <div className="absolute inset-0 bg-gradient-to-br from-amber-400/15 via-yellow-500/10 to-orange-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
             <div className="absolute top-4 right-4 w-24 h-24 bg-gradient-to-br from-amber-400/20 to-yellow-500/20 rounded-full blur-2xl"></div>
 
-            {/* Image Section */}
             <div className="relative h-64 overflow-hidden bg-black/30">
               {capsule.imageUrl && !capsule.isLocked ? (
                 <div className="relative h-full">
@@ -1032,9 +1028,7 @@ export function MyCapsules() {
               )}
             </div>
 
-            {/* Content Section */}
             <div className="relative z-10 p-8 space-y-6">
-              {/* Title and Description */}
               <div className="space-y-3">
                 <h3 className="font-black text-2xl text-white truncate group-hover:text-amber-400 transition-colors duration-300">
                   {capsule.name}
@@ -1044,7 +1038,6 @@ export function MyCapsules() {
                 </p>
               </div>
 
-              {/* Metadata */}
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
                   <div className="flex items-center gap-2 bg-white/5 px-4 py-2.5 rounded-xl border border-amber-400/20">
@@ -1071,7 +1064,6 @@ export function MyCapsules() {
                 )}
               </div>
 
-              {/* Action Buttons */}
               <div className="flex flex-wrap gap-2 pt-4">
                 <Button
                   variant="outline"
@@ -1083,7 +1075,6 @@ export function MyCapsules() {
                   <span className="font-semibold">View</span>
                 </Button>
 
-                {/* Update Button - Show for all locked capsules */}
                 {capsule.isLocked && (
                   <Button
                     variant="outline"
@@ -1130,7 +1121,6 @@ export function MyCapsules() {
 
                 {!capsule.isLocked && (
                   <>
-                    {/* Show Mint NFT button only if NFT is not minted */}
                     {!hasMintedNFT(capsule) && (
                       <Button
                         variant="outline"
@@ -1150,7 +1140,7 @@ export function MyCapsules() {
 
 
 
-                    {/* Transfer Button - Only show for capsule owners */}
+                    {}
                     {isCurrentOwner(capsule) && (
                       <Button
                         variant="outline"
@@ -1158,7 +1148,7 @@ export function MyCapsules() {
                         onClick={() => {
                           const { transferType } = getTransferButtonInfo(capsule);
                           setShowTransferDialog(capsule.id);
-                          setTransferCNFT(transferType === 'both'); // Enable CNFT transfer only if both are available
+                          setTransferCNFT(transferType === 'both'); 
                         }}
                         className="flex-1 min-w-[120px] bg-white/5 hover:bg-blue-400/10 text-white hover:text-blue-200 border-blue-400/30 hover:border-blue-400/60 transition-all duration-300 px-4 py-2.5 rounded-xl"
                         disabled={transferring === capsule.id || !getTransferButtonInfo(capsule).canTransfer}
@@ -1168,14 +1158,14 @@ export function MyCapsules() {
                       </Button>
                     )}
 
-                    {/* CNFT Transfer Button - Show for transferred capsules with CNFTs */}
+                    {}
                     {!isCurrentOwner(capsule) && hasAssociatedCNFT(capsule) && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
                           setShowTransferDialog(capsule.id);
-                          setTransferCNFT(true); // Always enable CNFT transfer for this case
+                          setTransferCNFT(true); 
                         }}
                         className="flex-1 min-w-[120px] bg-white/5 hover:bg-purple-400/10 text-white hover:text-purple-200 border-purple-400/30 hover:border-purple-400/60 transition-all duration-300 px-4 py-2.5 rounded-xl"
                         disabled={transferring === capsule.id}
@@ -1185,7 +1175,7 @@ export function MyCapsules() {
                       </Button>
                     )}
 
-                    {/* View NFT button for minted NFTs */}
+                    {}
                     {hasMintedNFT(capsule) && (
                       <Button
                         variant="outline"
@@ -1204,18 +1194,18 @@ export function MyCapsules() {
               </div>
             </div>
 
-            {/* Hover Glow Effect */}
+            {}
             <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-amber-400/0 via-yellow-400/0 to-orange-400/0 group-hover:from-amber-400/10 group-hover:via-yellow-400/5 group-hover:to-orange-400/10 transition-all duration-700 pointer-events-none" />
           </div>
         ))}
       </div>
 
-      {/* Capsule Detail Modal */}
+      {}
       {selectedCapsule && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-amber-400/30 backdrop-blur-xl">
             <div className="relative">
-              {/* Header */}
+              {}
               <div className="p-6 pb-4 border-b border-gray-700/30">
                 <div className="flex items-start justify-between">
                   <div className="space-y-2">
@@ -1235,7 +1225,7 @@ export function MyCapsules() {
                   </Button>
                 </div>
                 
-                {/* Status Badge */}
+                {}
                 <div className="mt-4">
                   {selectedCapsule.isLocked ? (
                     isUnlocked(selectedCapsule.unlockDate) ? (
@@ -1258,9 +1248,9 @@ export function MyCapsules() {
                 </div>
               </div>
 
-              {/* Content */}
+              {}
               <div className="p-8 space-y-8">
-                {/* Image */}
+                {}
                 {selectedCapsule.imageUrl && !selectedCapsule.isLocked && (
                   <div className="relative overflow-hidden rounded-2xl shadow-lg group">
                     <img
@@ -1270,7 +1260,7 @@ export function MyCapsules() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
 
-                    {/* Fullscreen Icon */}
+                    {}
                     <Button
                       variant="outline"
                       size="sm"
@@ -1282,7 +1272,7 @@ export function MyCapsules() {
                   </div>
                 )}
 
-                {/* Message */}
+                {}
                 <div className="bg-white/5 rounded-2xl p-6 border border-amber-400/20">
                   <h4 className="font-bold text-white mb-4 flex items-center gap-3">
                     <div className="w-3 h-3 bg-amber-400 rounded-full"></div>
@@ -1291,7 +1281,7 @@ export function MyCapsules() {
                   <p className="text-gray-300 leading-relaxed text-lg">{selectedCapsule.description}</p>
                 </div>
 
-                {/* Metadata Grid */}
+                {}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-white/5 rounded-xl p-6 border border-amber-400/20">
                     <div className="flex items-center gap-3 text-base text-gray-300 mb-3">
@@ -1358,7 +1348,7 @@ export function MyCapsules() {
                   )}
                 </div>
 
-                {/* Actions */}
+                {}
                 <div className="flex flex-wrap gap-4 pt-6">
                   {selectedCapsule.isLocked && isUnlocked(selectedCapsule.unlockDate) && (
                     <Button
@@ -1391,7 +1381,7 @@ export function MyCapsules() {
         </div>
       )}
 
-      {/* Mint NFT Dialog */}
+      {}
       {showMintDialog && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] border border-amber-400/30 backdrop-blur-xl overflow-hidden">
@@ -1407,7 +1397,7 @@ export function MyCapsules() {
               </div>
               <div className="space-y-6">
               {mintingCapsule === showMintDialog ? (
-                // Minting in progress
+                
                 <div className="space-y-6">
                   <div className="text-center">
                     <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-amber-400" />
@@ -1426,7 +1416,7 @@ export function MyCapsules() {
                   </p>
                 </div>
               ) : (
-                // NFT type selection
+                
                 <>
                   <div className="space-y-4">
                     <div className="text-center">
@@ -1472,7 +1462,7 @@ export function MyCapsules() {
         </div>
       )}
 
-      {/* Transfer cNFT Dialog */}
+      {}
       {showTransferDialog && (() => {
         const capsule = userCapsules.find(c => c.id === showTransferDialog);
         if (!capsule) return null;
@@ -1513,7 +1503,7 @@ export function MyCapsules() {
           );
         }
         
-        // Determine the actual transfer type for the dialog
+        
         let dialogTransferType = transferType;
         if (isTransferredCapsule) {
           dialogTransferType = 'cnft-only';
@@ -1564,7 +1554,7 @@ export function MyCapsules() {
                     )}
                   </div>
 
-                  {/* CNFT Transfer Checkbox - Only show for both transfer types */}
+                  {}
                   {dialogTransferType === 'both' && (
                     <div className="flex items-center space-x-3 p-4 bg-white/5 rounded-xl border border-amber-400/20">
                       <input
@@ -1584,7 +1574,7 @@ export function MyCapsules() {
                     </div>
                   )}
 
-                  {/* CNFT-only transfer info */}
+                  {}
                   {dialogTransferType === 'cnft-only' && (
                     <div className="p-4 bg-purple-500/10 rounded-xl border border-purple-400/20">
                       <div className="flex items-center space-x-2 mb-2">
@@ -1638,12 +1628,12 @@ export function MyCapsules() {
         );
       })()}
 
-      {/* NFT Viewer Dialog */}
+      {}
       {showNFTViewer && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-gradient-to-br from-slate-900/95 via-black/90 to-slate-800/95 rounded-3xl shadow-2xl max-w-7xl w-full max-h-[90vh] border border-slate-600/30 backdrop-blur-xl overflow-hidden">
             <div className="p-8 overflow-y-auto max-h-[calc(90vh-64px)]">
-              {/* Header */}
+              {}
               <div className="text-center mb-10">
                 <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-emerald-400 via-green-500 to-teal-600 rounded-3xl mb-6 shadow-2xl shadow-emerald-400/20">
                   <Eye className="h-12 w-12 text-white" />
@@ -1662,9 +1652,9 @@ export function MyCapsules() {
 
                 return (
                   <div className="space-y-8">
-                    {/* Main NFT Display */}
+                    {}
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                      {/* NFT Image and Basic Info */}
+                      {}
                       <div className="xl:col-span-1">
                         <div className="bg-gradient-to-br from-slate-800/50 via-slate-700/30 to-slate-600/20 rounded-3xl p-8 border border-slate-600/30 shadow-xl h-full flex flex-col justify-center">
                           <div className="text-center">
@@ -1675,7 +1665,7 @@ export function MyCapsules() {
                                 alt={capsule.name}
                                 className="relative w-40 h-40 object-cover rounded-3xl mx-auto shadow-2xl border-2 border-white/10"
                               />
-                              {/* cNFT Status Badge */}
+                              {}
                               {hasAssociatedCNFT(capsule) && (
                                 <div className="absolute -top-2 -right-2 bg-gradient-to-r from-purple-500 to-violet-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg border-2 border-white/20">
                                   cNFT
@@ -1688,7 +1678,7 @@ export function MyCapsules() {
                             <p className="text-lg text-gray-300 leading-relaxed px-4">
                               {capsule.description}
                             </p>
-                            {/* cNFT Info */}
+                            {}
                             {hasAssociatedCNFT(capsule) && (
                               <div className="mt-4 p-3 bg-purple-500/10 rounded-2xl border border-purple-400/20">
                                 <div className="text-sm text-purple-200 font-medium">
@@ -1703,10 +1693,10 @@ export function MyCapsules() {
                         </div>
                       </div>
 
-                      {/* NFT Details Grid */}
+                      {}
                       <div className="xl:col-span-2">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          {/* Type and Status */}
+                          {}
                           <div className="group bg-gradient-to-br from-blue-600/10 via-blue-500/5 to-indigo-600/10 rounded-3xl p-6 border border-blue-500/20 shadow-lg hover:shadow-blue-500/10 transition-all duration-500 hover:scale-[1.02]">
                             <div className="flex items-center space-x-3 mb-4">
                               <div className="w-4 h-4 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full shadow-lg shadow-blue-400/30"></div>
@@ -1727,7 +1717,7 @@ export function MyCapsules() {
                             </div>
                           </div>
 
-                          {/* Transaction Info */}
+                          {}
                           <div className="group bg-gradient-to-br from-purple-600/10 via-purple-500/5 to-violet-600/10 rounded-3xl p-6 border border-purple-500/20 shadow-lg hover:shadow-purple-500/10 transition-all duration-500 hover:scale-[1.02]">
                             <div className="flex items-center space-x-3 mb-4">
                               <div className="w-4 h-4 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full shadow-lg shadow-purple-400/30"></div>
@@ -1737,7 +1727,7 @@ export function MyCapsules() {
                               <div className="text-sm text-gray-600 dark:text-gray-400">
                                 <span className="font-medium">Transaction Signature:</span>{' '}
                                 <a
-                                  href={`https://solscan.io/tx/${capsule.metadata.mintSignature}?cluster=devnet`}
+                                  href={`https://solscan.io/tx/${capsule.metadata.mintSignature}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 break-all"
@@ -1749,7 +1739,7 @@ export function MyCapsules() {
                               <div className="text-sm text-gray-600 dark:text-gray-400">
                                 <span className="font-medium">Transaction ID:</span>{' '}
                                 <a
-                                  href={`https://solscan.io/tx/${capsule.metadata.transactionId}?cluster=devnet`}
+                                  href={`https://solscan.io/tx/${capsule.metadata.transactionId}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 break-all"
@@ -1767,7 +1757,7 @@ export function MyCapsules() {
                             )}
                           </div>
 
-                          {/* Merkle Tree Info */}
+                          {}
                           <div className="group bg-gradient-to-br from-amber-600/10 via-orange-500/5 to-red-600/10 rounded-3xl p-6 border border-amber-500/20 shadow-lg hover:shadow-amber-500/10 transition-all duration-500 hover:scale-[1.02]">
                             <div className="flex items-center space-x-3 mb-4">
                               <div className="w-4 h-4 bg-gradient-to-br from-amber-400 to-orange-600 rounded-full shadow-lg shadow-amber-400/30"></div>
@@ -1800,7 +1790,7 @@ export function MyCapsules() {
                             </div>
                           </div>
 
-                          {/* Verification Guide */}
+                          {}
                           <div className="group bg-gradient-to-br from-emerald-600/10 via-green-500/5 to-teal-600/10 rounded-3xl p-6 border border-emerald-500/20 shadow-lg hover:shadow-emerald-500/10 transition-all duration-500 hover:scale-[1.02]">
                             <div className="flex items-center space-x-3 mb-4">
                               <div className="w-4 h-4 bg-gradient-to-br from-emerald-400 to-green-600 rounded-full shadow-lg shadow-emerald-400/30"></div>
@@ -1821,14 +1811,14 @@ export function MyCapsules() {
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
+                    {}
                     <div className="flex flex-col sm:flex-row gap-4 pt-8">
                       <Button
                         onClick={() => {
                           const treeAddress = capsule.metadata?.treeAddress || 
                                             process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS;
                           if (treeAddress) {
-                            window.open(`https://solscan.io/account/${treeAddress}?cluster=devnet`, '_blank');
+                            window.open(`https://solscan.io/tree/${treeAddress}`)
                           } else {
                             toast.error('No tree address available to view');
                           }
@@ -1844,7 +1834,7 @@ export function MyCapsules() {
                           const treeAddress = capsule.metadata?.treeAddress || 
                                             process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS;
                           if (treeAddress) {
-                            window.open(`https://explorer.solana.com/address/${treeAddress}?cluster=devnet`, '_blank');
+                            window.open(`https://explorer.solana.com/address/${treeAddress}`)
                           } else {
                             toast.error('No tree address available to view');
                           }
@@ -1871,7 +1861,7 @@ export function MyCapsules() {
         </div>
       )}
 
-      {/* Fullscreen Image Modal */}
+      {}
       {showFullscreenImage && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setShowFullscreenImage(null)}>
           <div className="relative max-w-5xl max-h-full">
@@ -1895,7 +1885,7 @@ export function MyCapsules() {
         </div>
       )}
 
-      {/* Capsule Update Modal */}
+      {}
       {(() => {
         if (!showUpdateModal) return null;
         const capsule = userCapsules.find(c => c.id === showUpdateModal);
@@ -1907,14 +1897,14 @@ export function MyCapsules() {
             isOpen={!!showUpdateModal}
             onClose={() => setShowUpdateModal(null)}
             onUpdate={() => {
-              // Reload capsules to get fresh data
+              
               loadUserCapsules();
             }}
           />
         );
       })()}
 
-      {/* Toast Container */}
+      {}
       <Toaster
         position="top-right"
         toastOptions={{

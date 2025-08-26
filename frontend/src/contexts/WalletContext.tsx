@@ -12,7 +12,7 @@ import {
 } from '@solana/wallet-adapter-react-ui';
 import { getRPCEndpoint, getNetwork, isUsingHelius } from '@/lib/rpc-config';
 
-// Import wallet adapter CSS
+
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 interface WalletContextProviderProps {
@@ -22,10 +22,10 @@ interface WalletContextProviderProps {
 export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
   children,
 }) => {
-  // Get optimized RPC endpoint (Helius or fallback)
+  
   const endpoint = useMemo(() => getRPCEndpoint(), []);
   
-  // Get network configuration
+  
   const network = useMemo(() => getNetwork(), []);
 
 
@@ -35,7 +35,7 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
     ],
-    [] // No dependencies needed for static wallet adapters
+    [] 
   );
 
   return (

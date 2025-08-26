@@ -50,7 +50,6 @@ class NFTService {
   private connection: Connection
 
   constructor() {
-    // Use optimized connection configuration for Helius
     this.connection = createOptimizedConnection()
   }
 
@@ -64,13 +63,11 @@ class NFTService {
     try {
       onProgress?.('Uploading image to IPFS...', 20)
       
-      // Upload image to IPFS
       const imageUpload = await ipfsService.uploadFile(params.image)
       const imageUrl = ipfsService.getIPFSUrl(imageUpload.IpfsHash)
 
       onProgress?.('Creating metadata...', 60)
 
-      // Create and upload metadata
       const metadata = ipfsService.createNFTMetadata({
         name: params.name,
         description: params.description,
@@ -131,15 +128,12 @@ class NFTService {
     try {
       onProgress?.('Initializing cNFT service...', 10)
       
-      // Initialize the cNFT service with the wallet
       await cnftService.initialize(wallet)
 
-      // Check if we have a default tree
       let tree = cnftService.getDefaultTree()
       if (!tree && !treeAddress) {
         throw new Error('No Merkle tree available. Please create a tree first using the admin script or provide a tree address.')
       } else if (treeAddress) {
-        // Use provided tree address
         const { publicKey } = await import('@metaplex-foundation/umi')
         tree = publicKey(treeAddress)
         cnftService.setDefaultTree(tree)
@@ -147,7 +141,6 @@ class NFTService {
 
       onProgress?.('Preparing cNFT metadata...', 25)
 
-      // Convert MintCapsuleParams to MintCNFTParams
       const cnftParams: MintCNFTParams = {
         name: params.name,
         description: params.description,
@@ -157,7 +150,6 @@ class NFTService {
         attributes: params.attributes
       }
 
-      // Validate parameters (allow past unlock dates for existing unlocked capsules)
       const validation = cnftService.validateMintParams(cnftParams, true)
       if (!validation.isValid) {
         throw new Error(`Invalid parameters: ${validation.errors.join(', ')}`)
@@ -165,12 +157,10 @@ class NFTService {
 
       onProgress?.('Minting compressed NFT...', 40)
 
-      // Mint the compressed NFT
       const cnftResult: CNFTMintResult = await cnftService.mintCNFT(
         cnftParams,
         tree,
         (step, progress) => {
-          // Map cNFT service progress to our progress range (40-95)
           const mappedProgress = 40 + Math.round((progress / 100) * 55)
           onProgress?.(step, mappedProgress)
         }
@@ -178,10 +168,9 @@ class NFTService {
 
       onProgress?.('cNFT minting completed!', 100)
 
-      // Convert CNFTMintResult to MintResult format
       return {
         signature: cnftResult.signature,
-        mint: cnftResult.assetId, // Use assetId as mint for cNFTs
+        mint: cnftResult.assetId, 
         assetId: cnftResult.assetId,
         metadata: {
           name: cnftResult.metadata.name,
@@ -214,18 +203,13 @@ class NFTService {
     try {
       onProgress?.('Preparing metadata...', 20)
       
-      // Prepare metadata and upload to IPFS
       const { imageUrl, metadataUri, metadata } = await this.prepareCapsuleMetadata(params, onProgress)
       
       onProgress?.('Minting regular NFT...', 60)
       
-      // For now, we'll simulate the regular NFT minting process
-      // In a real implementation, you would use Metaplex Token Metadata to mint regular NFTs
       
-      // Simulate minting delay
       await new Promise(resolve => setTimeout(resolve, 2000))
       
-      // Generate mock results for demo
       const mockSignature = `nft_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       const mockMint = `nft_mint_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       const mockAssetId = `asset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -253,16 +237,13 @@ class NFTService {
    */
   async getWalletNFTs(walletAddress: PublicKey): Promise<CapsuleMetadata[]> {
     try {
-      // Convert Solana PublicKey to UMI PublicKey
       const { publicKey } = await import('@metaplex-foundation/umi')
       const umiPublicKey = publicKey(walletAddress.toString())
 
-      // Fetch cNFTs using the cNFT service
       const assets = await cnftService.fetchWalletCNFTs(umiPublicKey)
 
-      // Convert DAS assets to CapsuleMetadata format
       const capsules: CapsuleMetadata[] = assets
-        .filter(asset => asset.content?.metadata) // Only assets with metadata
+        .filter(asset => asset.content?.metadata) 
         .map(asset => {
           const metadata = asset.content!.metadata!
           return {
@@ -282,7 +263,6 @@ class NFTService {
       return capsules
     } catch (error) {
       console.error('Error fetching wallet cNFTs:', error)
-      // Return empty array on error to prevent UI breaks
       return []
     }
   }
@@ -315,7 +295,6 @@ class NFTService {
     onUpdate?: (status: 'pending' | 'confirmed' | 'failed', details?: Record<string, unknown>) => void
   ): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      // Set timeout for transaction confirmation (30 seconds)
       const timeoutId = setTimeout(() => {
         heliusWebSocket.unsubscribeFromTransaction(`transaction-${signature}`);
         onUpdate?.('failed', { reason: 'Transaction confirmation timeout' });
@@ -326,7 +305,6 @@ class NFTService {
         clearTimeout(timeoutId);
       };
 
-      // Subscribe to real-time transaction updates
       heliusWebSocket.subscribeToTransaction(
         signature,
         (confirmation) => {
@@ -350,7 +328,6 @@ class NFTService {
         reject(error);
       });
 
-      // Initial status
       onUpdate?.('pending', { signature });
     });
   }
@@ -426,9 +403,8 @@ class NFTService {
       errors.push('Unlock date must be in the future')
     }
 
-    // Validate image file
     if (params.image) {
-      const maxSize = 10 * 1024 * 1024 // 10MB
+      const maxSize = 10 * 1024 * 1024 
       if (params.image.size > maxSize) {
         errors.push('Image file must be smaller than 10MB')
       }

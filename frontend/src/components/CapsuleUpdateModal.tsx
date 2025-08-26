@@ -33,7 +33,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
 
   if (!isOpen || !capsule) return null;
   
-  // Only allow updates for locked capsules
   if (!capsule.isLocked) {
     return null;
   }
@@ -52,7 +51,7 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
     onDrop,
     accept: { 'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'] },
     maxFiles: 1,
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: 10 * 1024 * 1024,
   });
 
   const handleInputChange = (field: string, value: string | boolean) => {
@@ -63,12 +62,10 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
   const validateForm = (): boolean => {
     const newErrors: string[] = [];
 
-    // Check if at least one field is being updated
     if (!formData.newContent && !formData.newUnlockDate && !newImage) {
       newErrors.push('Please select at least one field to update');
     }
 
-    // Validate unlock date if provided
     if (formData.newUnlockDate) {
       const newDate = new Date(formData.newUnlockDate);
       const currentUnlockDate = new Date(capsule.unlockDate);
@@ -78,7 +75,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
       }
     }
 
-    // Validate content length if provided
     if (formData.newContent && formData.newContent.length > 1000) {
       newErrors.push('Content must be 1000 characters or less');
     }
@@ -95,13 +91,11 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
       let encryptedImageUrl: string | undefined;
       let encryptedImageIv: string | undefined;
 
-      // Handle image upload and encryption if new image is provided
       if (newImage) {
         setIsUploading(true);
         setUploadProgress(0);
         
         try {
-          // Upload image to Pinata
           const imageUpload = await ipfsService.uploadFileWithProgress(newImage, (p) => {
             const mapped = Math.min(70, Math.max(0, Math.round(p.percentage * 0.7)));
             setUploadProgress(mapped);
@@ -110,7 +104,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
           const pinataUrl = ipfsService.getIPFSUrl(imageUpload.IpfsHash);
           setUploadProgress(75);
 
-          // Encrypt the Pinata URL
           const unlockTimestamp = Math.floor(new Date(capsule.unlockDate).getTime() / 1000);
           const encryptedData = await encryptionService.encryptPinataUrl(
             pinataUrl,
@@ -152,14 +145,13 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
         formData.newContent || undefined,
         newUnlockDate,
         encryptedImageUrl || undefined,
-        false // Never remove encrypted URL
+        false
       );
 
       toast.success('🎉 Capsule updated successfully!', {
         duration: 4000,
       });
 
-      // Reset form
       setFormData({
         newContent: '',
         newUnlockDate: ''
@@ -168,7 +160,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
       setImagePreview('');
       setUploadProgress(0);
 
-      // Notify parent component
       onUpdate();
       onClose();
 
@@ -201,7 +192,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
       <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] border border-amber-400/30 backdrop-blur-xl overflow-hidden">
         <div className="relative">
-          {/* Header */}
           <div className="p-6 pb-4 border-b border-gray-700/30">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
@@ -225,9 +215,7 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
             </div>
           </div>
 
-                      {/* Content */}
-            <div className="p-8 space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-            {/* Current Capsule Info */}
+                      <div className="p-8 space-y-6 overflow-y-auto max-h-[calc(90vh-120px)]">
             <div className="bg-white/5 rounded-2xl p-6 border border-amber-400/20">
               <h4 className="font-bold text-white mb-4 flex items-center gap-3">
                 <div className="w-3 h-3 bg-amber-400 rounded-full"></div>
@@ -256,7 +244,7 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
               </div>
             </div>
 
-            {/* Image Upload Section */}
+            {}
             <div className="space-y-3">
               <label className="text-base font-semibold text-white flex items-center gap-2">
                 <ImageIcon className="h-4 w-4 text-amber-400" />
@@ -298,7 +286,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
                 )}
               </div>
               
-              {/* Upload Progress */}
               {isUploading && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
@@ -315,9 +302,7 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
               )}
             </div>
 
-            {/* Update Options */}
             <div className="space-y-6">
-              {/* Content Update */}
               <div className="space-y-3">
                 <label className="text-base font-semibold text-white flex items-center gap-2">
                   <Edit3 className="h-4 w-4 text-amber-400" />
@@ -335,7 +320,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
                 </p>
               </div>
 
-              {/* Unlock Date Update */}
               <div className="space-y-3">
                 <label className="text-base font-semibold text-white flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-amber-400" />
@@ -358,7 +342,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
 
             </div>
 
-            {/* Error Display */}
             {errors.length > 0 && (
               <div className="space-y-2">
                 {errors.map((error, index) => (
@@ -370,7 +353,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="flex gap-4 pt-6">
               <Button
                 onClick={handleUpdate}

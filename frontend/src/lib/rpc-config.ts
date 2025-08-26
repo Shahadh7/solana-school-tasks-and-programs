@@ -14,22 +14,19 @@ export interface RPCConfig {
 export function getRPCConfig(): RPCConfig {
   const network = WalletAdapterNetwork.Devnet;
   
-  // Check for custom RPC URL (Helius)
   const customRPC = process.env.NEXT_PUBLIC_RPC_URL;
   
   if (customRPC) {
-    // Helius optimized settings
     return {
       endpoint: customRPC,
       commitment: 'confirmed',
-      confirmTransactionInitialTimeout: 60000, // 60 seconds for Helius
+      confirmTransactionInitialTimeout: 60000, 
       httpHeaders: {
         'Content-Type': 'application/json',
       },
     };
   }
 
-  // Fallback to default Solana RPC
   return {
     endpoint: clusterApiUrl(network),
     commitment: 'confirmed',
@@ -50,7 +47,6 @@ export function createOptimizedConnection(): Connection {
       commitment: config.commitment,
       confirmTransactionInitialTimeout: config.confirmTransactionInitialTimeout,
       httpHeaders: config.httpHeaders,
-      // Use proper WebSocket endpoint
       wsEndpoint: wsEndpoint,
     }
   );
@@ -60,34 +56,29 @@ export function createOptimizedConnection(): Connection {
  * Get the proper WebSocket endpoint for Helius
  */
 export function getWebSocketEndpoint(): string {
-  // Check for dedicated WebSocket URL first
   const dedicatedWsUrl = process.env.NEXT_PUBLIC_HELIUS_WEBSOCKET_URL;
   if (dedicatedWsUrl) {
     console.log('🔌 Using dedicated Helius WebSocket URL:', dedicatedWsUrl);
     return dedicatedWsUrl;
   }
   
-  // Fallback to converting HTTP endpoint to WebSocket
   const httpEndpoint = getRPCEndpoint();
   
   if (isUsingHelius()) {
-    // Helius WebSocket endpoint - properly formatted
-    const wsEndpoint = httpEndpoint.replace('https://', 'wss://').replace('http://', 'ws://');
+    const wsEndpoint = httpEndpoint.replace('https://', 'wss://');
     console.log('🔌 Using converted Helius WebSocket URL:', wsEndpoint);
     return wsEndpoint;
   }
   
-  // Fallback for standard Solana RPC WebSocket
   if (httpEndpoint.includes('devnet')) {
-    return 'wss://api.devnet.solana.com/';
+    return 'wss://api.devnet.solana.com';
   } else if (httpEndpoint.includes('testnet')) {
-    return 'wss://api.testnet.solana.com/';
+    return 'wss://api.testnet.solana.com';
   } else if (httpEndpoint.includes('mainnet')) {
-    return 'wss://api.mainnet-beta.solana.com/';
+    return 'wss://api.mainnet-beta.solana.com';
   }
   
-  // Default fallback
-  return httpEndpoint.replace('https://', 'wss://').replace('http://', 'ws://');
+  return httpEndpoint.replace('https://', 'wss://');
 }
 
 /**

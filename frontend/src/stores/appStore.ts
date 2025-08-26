@@ -39,30 +39,24 @@ export interface MintingState {
 }
 
 interface AppState {
-  // User state
   userCapsules: Capsule[]
   
-  // Minting state
   minting: MintingState
   
-  // IPFS uploads
   uploadedFiles: Array<{
     url: string
     filename: string
     size: number
   }>
   
-  // Actions
   setUserCapsules: (capsules: Capsule[]) => void
   addCapsule: (capsule: Capsule) => void
   updateCapsule: (id: string, updates: Partial<Capsule>) => void
   removeCapsule: (id: string) => void
   
-  // Minting actions
   setMintingState: (state: Partial<MintingState>) => void
   resetMinting: () => void
   
-  // File upload actions
   addUploadedFile: (file: { url: string; filename: string; size: number }) => void
   clearUploadedFiles: () => void
 }
@@ -70,7 +64,6 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   devtools(
     (set, _get) => ({
-      // Initial state
       userCapsules: [],
       minting: {
         isLoading: false,
@@ -79,7 +72,6 @@ export const useAppStore = create<AppState>()(
       },
       uploadedFiles: [],
       
-      // User capsule actions
       setUserCapsules: (capsules) =>
         set({ userCapsules: capsules }, false, 'setUserCapsules'),
       
@@ -112,7 +104,6 @@ export const useAppStore = create<AppState>()(
           'removeCapsule'
         ),
       
-      // Minting actions
       setMintingState: (newState) =>
         set(
           (state) => ({
@@ -135,7 +126,6 @@ export const useAppStore = create<AppState>()(
           'resetMinting'
         ),
       
-      // File upload actions
       addUploadedFile: (file) =>
         set(
           (state) => ({

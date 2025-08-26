@@ -6,7 +6,6 @@ import { Upload, Zap } from 'lucide-react';
 export function BentoGrid() {
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Header */}
       <div className="text-center mb-16">
         <h2 className="text-4xl md:text-6xl font-black mb-6 crypto-text-gradient">Ready to Start?</h2>
         <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
@@ -14,10 +13,8 @@ export function BentoGrid() {
         </p>
       </div>
 
-      {/* Enhanced Bento Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6 md:gap-8 auto-rows-[minmax(200px,auto)]">
         
-        {/* Step 1 - Hero Card */}
         <Card className="md:col-span-4 lg:col-span-3 md:row-span-2 group relative overflow-hidden border-white/10 bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 backdrop-blur-xl hover:border-amber-400/60 transition-all duration-700 hover:shadow-2xl hover:shadow-amber-400/30">
           <div className="absolute inset-0 bg-gradient-to-br from-amber-400/15 via-yellow-500/10 to-orange-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
           <div className="absolute top-4 right-4 w-24 h-24 bg-gradient-to-br from-amber-400/20 to-yellow-500/20 rounded-full blur-2xl"></div>
@@ -49,7 +46,6 @@ export function BentoGrid() {
           </CardContent>
         </Card>
 
-        {/* Step 2 - Upload Card */}
         <Card className="md:col-span-2 lg:col-span-3 md:row-span-1 group relative overflow-hidden border-white/10 bg-gradient-to-br from-black/40 via-black/20 to-yellow-950/20 backdrop-blur-xl hover:border-yellow-400/60 transition-all duration-700 hover:shadow-2xl hover:shadow-yellow-400/30">
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/15 via-yellow-500/10 to-amber-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
           <div className="absolute bottom-4 left-4 w-20 h-20 bg-gradient-to-br from-yellow-400/30 to-amber-500/20 rounded-full blur-2xl"></div>
@@ -74,7 +70,6 @@ export function BentoGrid() {
           </CardContent>
         </Card>
 
-        {/* Step 3 - Time Lock Card */}
         <Card className="md:col-span-2 lg:col-span-3 md:row-span-1 group relative overflow-hidden border-white/10 bg-gradient-to-br from-black/40 via-black/20 to-orange-950/20 backdrop-blur-xl hover:border-orange-400/60 transition-all duration-700 hover:shadow-2xl hover:shadow-orange-400/30">
           <div className="absolute inset-0 bg-gradient-to-br from-orange-400/15 via-orange-500/10 to-red-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
           <div className="absolute top-4 right-4 w-20 h-20 bg-gradient-to-br from-orange-400/30 to-red-500/20 rounded-full blur-2xl"></div>
@@ -96,8 +91,7 @@ export function BentoGrid() {
           </CardContent>
         </Card>
 
-        {/* Step 4 - Share Card */}
-        <Card className="md:col-span-2 lg:col-span-3 group relative overflow-hidden border-white/10 bg-gradient-to-br from-black/40 via-black/20 to-emerald-950/20 backdrop-blur-xl hover:border-emerald-400/60 transition-all duration-700 hover:shadow-2xl hover:shadow-emerald-400/30">
+        <Card className="md:col-span-3 group relative overflow-hidden border-white/10 bg-gradient-to-br from-black/40 via-black/20 to-emerald-950/20 backdrop-blur-xl hover:border-emerald-400/60 transition-all duration-700 hover:shadow-2xl hover:shadow-emerald-400/30">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/15 via-green-500/10 to-lime-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
           <CardContent className="p-6 md:p-8 relative z-10 h-full flex flex-col justify-center text-center">
             <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 via-green-500 to-lime-500 text-black rounded-2xl flex items-center justify-center text-2xl font-black shadow-xl shadow-emerald-400/40 mx-auto mb-6 group-hover:scale-110 transition-transform duration-500">
@@ -117,7 +111,6 @@ export function BentoGrid() {
           </CardContent>
         </Card>
 
-        {/* CTA Card */}
         <Card className="md:col-span-2 lg:col-span-3 group relative overflow-hidden border-amber-400/30 bg-gradient-to-br from-amber-950/40 via-yellow-950/30 to-orange-950/40 backdrop-blur-xl hover:border-amber-400/80 transition-all duration-700 hover:shadow-2xl hover:shadow-amber-400/40">
           <div className="absolute inset-0 bg-gradient-to-br from-amber-400/20 via-yellow-500/15 to-orange-400/20 opacity-50 group-hover:opacity-80 transition-opacity duration-700"></div>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.1),transparent_70%)]"></div>

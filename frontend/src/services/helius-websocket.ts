@@ -47,7 +47,6 @@ class HeliusWebSocketService {
   private reconnectInterval: number = 3000;
   private eventListeners: Map<WebSocketEventType, Set<(event: WebSocketEvent) => void>> = new Map();
   
-  // Subscription tracking
   private accountSubscriptions: Map<string, number> = new Map();
   private transactionSubscriptions: Map<string, number> = new Map();
   private programSubscriptions: Map<string, number> = new Map();
@@ -57,7 +56,6 @@ class HeliusWebSocketService {
     this.wsEndpoint = this.getWebSocketEndpoint();
     this.initializeEventListeners();
     
-    // Log WebSocket configuration
     if (isUsingHelius()) {
       if (isUsingDedicatedWebSocket()) {
         console.log('🔌 Helius WebSocket Service initialized with dedicated WebSocket URL');
@@ -69,7 +67,6 @@ class HeliusWebSocketService {
       console.log('🔌 WebSocket Service initialized with standard Solana RPC');
     }
 
-    // Initialize connection status checking
     this.initializeConnectionCheck().catch((error) => {
       console.warn('Failed to initialize connection status check:', error);
     });
@@ -122,14 +119,12 @@ class HeliusWebSocketService {
       const subscriptionId = await this.connection.onAccountChange(
         publicKey,
         (accountInfo, context) => {
-          // Emit WebSocket event
           this.emitEvent('account-change', {
             publicKey: publicKey.toString(),
             accountInfo,
             context
           });
           
-          // Call the callback
           callback(accountInfo, context);
         },
         commitment
@@ -159,21 +154,18 @@ class HeliusWebSocketService {
         throw new Error('onSignature method not available in this Solana web3.js version');
       }
 
-      // Use confirmTransaction for transaction confirmation (more reliable)
       let subscriptionId: number | null = null;
       
       try {
         subscriptionId = await this.connection.onSignature(
           signature,
           (result, context) => {
-            // Emit WebSocket event
             this.emitEvent('transaction-confirmation', {
               signature,
               result,
               context
             });
             
-            // Call the callback
             callback({ signature, result, context });
           },
           commitment
@@ -181,7 +173,6 @@ class HeliusWebSocketService {
       } catch (error) {
         console.warn('onSignature failed, falling back to polling:', error);
         
-        // Fallback to polling if WebSocket subscription fails
         this.pollTransactionStatus(signature, callback, commitment);
         return `poll-${signature}`;
       }
@@ -203,7 +194,7 @@ class HeliusWebSocketService {
   async subscribeToProgramAccounts(
     programId: PublicKey,
     callback: (accountInfo: AccountInfo<Buffer> | null, context: Context) => void,
-    filters?: GetProgramAccountsFilter[], // Use proper Solana filter type
+    filters?: GetProgramAccountsFilter[], 
     commitment: 'confirmed' | 'finalized' = 'confirmed'
   ): Promise<string> {
     try {
@@ -214,7 +205,6 @@ class HeliusWebSocketService {
       const subscriptionId = await this.connection.onProgramAccountChange(
         programId,
         (keyedAccountInfo, context) => {
-          // Emit WebSocket event
           this.emitEvent('program-account-change', {
             programId: programId.toString(),
             accountId: keyedAccountInfo.accountId.toString(),
@@ -222,7 +212,6 @@ class HeliusWebSocketService {
             context
           });
           
-          // Call the callback
           callback(keyedAccountInfo.accountInfo, context);
         },
         commitment,
@@ -247,17 +236,13 @@ class HeliusWebSocketService {
     callback: (slotInfo: unknown) => void
   ): Promise<string> {
     try {
-      // Check if onSlotChange method exists
       if (!this.hasMethod('onSlotChange')) {
         console.warn('⚠️ onSlotChange not supported in this Solana web3.js version');
         
-        // Fallback: use onSlotUpdate if available
         if (this.hasMethod('onSlotUpdate')) {
           const subscriptionId = await (this.connection as Connection & { onSlotUpdate: (callback: (slotInfo: unknown) => void) => Promise<number> }).onSlotUpdate((slotInfo: unknown) => {
-            // Emit WebSocket event
             this.emitEvent('slot-change', slotInfo);
             
-            // Call the callback
             callback(slotInfo);
           });
           console.log('🔔 Subscribed to slot updates (fallback)');
@@ -268,10 +253,8 @@ class HeliusWebSocketService {
       }
 
       const subscriptionId = await (this.connection as Connection & { onSlotChange: (callback: (slotInfo: unknown) => void) => Promise<number> }).onSlotChange((slotInfo: unknown) => {
-        // Emit WebSocket event
         this.emitEvent('slot-change', slotInfo);
         
-        // Call the callback
         callback(slotInfo);
       });
 
@@ -280,7 +263,6 @@ class HeliusWebSocketService {
     } catch (error) {
       console.error('Failed to subscribe to slot changes:', error);
       console.warn('💡 Slot subscription disabled - continuing without real-time slot updates');
-      // Return a dummy subscription ID instead of throwing
       return 'slot-change-disabled';
     }
   }
@@ -307,7 +289,7 @@ class HeliusWebSocketService {
     callback: (confirmation: unknown) => void,
     commitment: 'confirmed' | 'finalized' = 'confirmed'
   ): Promise<void> {
-    const maxAttempts = 30; // 30 attempts = 60 seconds max
+    const maxAttempts = 30; 
     let attempts = 0;
 
     const poll = async () => {
@@ -318,7 +300,6 @@ class HeliusWebSocketService {
 
         if (status.value?.confirmationStatus === commitment || 
             status.value?.confirmationStatus === 'finalized') {
-          // Transaction confirmed
           callback({
             signature,
             result: { err: status.value.err },
@@ -328,7 +309,6 @@ class HeliusWebSocketService {
         }
 
         if (status.value?.err) {
-          // Transaction failed
           callback({
             signature,
             result: { err: status.value.err },
@@ -339,9 +319,8 @@ class HeliusWebSocketService {
 
         attempts++;
         if (attempts < maxAttempts) {
-          setTimeout(poll, 2000); // Poll every 2 seconds
+          setTimeout(poll, 2000); 
         } else {
-          // Timeout
           callback({
             signature,
             result: { err: 'Transaction confirmation timeout' },
@@ -449,12 +428,10 @@ class HeliusWebSocketService {
       programs: number;
     };
   } {
-    // Consider connected if we have active subscriptions or can reach the endpoint
     const hasActiveSubscriptions = this.accountSubscriptions.size > 0 || 
                                   this.transactionSubscriptions.size > 0 || 
                                   this.programSubscriptions.size > 0;
     
-    // For now, assume connected if we have the connection object and endpoint
     const connectionStatus = hasActiveSubscriptions || !!this.connection;
     
     return {
@@ -473,7 +450,6 @@ class HeliusWebSocketService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      // Try to get the latest blockhash to test connection
       const result = await this.connection.getLatestBlockhash();
       this.isConnected = !!result;
       return this.isConnected;
@@ -488,13 +464,11 @@ class HeliusWebSocketService {
    * Initialize connection status check
    */
   private async initializeConnectionCheck(): Promise<void> {
-    // Test connection immediately
     await this.testConnection();
     
-    // Set up periodic connection check
     setInterval(async () => {
       await this.testConnection();
-    }, 30000); // Check every 30 seconds
+    }, 30000); 
   }
 
   /**
@@ -503,19 +477,16 @@ class HeliusWebSocketService {
   async cleanup(): Promise<void> {
     console.log('🧹 Cleaning up WebSocket subscriptions...');
     
-    // Unsubscribe from all accounts
     const accountKeys = Array.from(this.accountSubscriptions.keys());
     for (const key of accountKeys) {
       await this.unsubscribeFromAccount(key);
     }
 
-    // Unsubscribe from all transactions
     const transactionKeys = Array.from(this.transactionSubscriptions.keys());
     for (const key of transactionKeys) {
       await this.unsubscribeFromTransaction(key);
     }
 
-    // Unsubscribe from all programs
     const programKeys = Array.from(this.programSubscriptions.keys());
     for (const key of programKeys) {
       await this.unsubscribeFromProgramAccounts(key);
@@ -525,7 +496,6 @@ class HeliusWebSocketService {
   }
 }
 
-// Export singleton instance
 export const heliusWebSocket = new HeliusWebSocketService();
 
 export default heliusWebSocket; 

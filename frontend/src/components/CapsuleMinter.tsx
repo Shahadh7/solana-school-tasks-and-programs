@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, Calendar, Loader2, CheckCircle, AlertCircle, Lock } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { useAppStore } from '@/stores/appStore';
-// import { format } from 'date-fns'; // Unused import
+
 import { WebSocketStatus } from '@/components/WebSocketStatus';
 import { ipfsService } from '@/services/ipfs';
 import { solanaService, CapsuleData } from '@/services/solana';
@@ -63,7 +63,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
     onDrop,
     accept: { 'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'] },
     maxFiles: 1,
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: 10 * 1024 * 1024,
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -91,7 +91,6 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
   const handleCreateCapsule = async () => {
     if (!connected || !publicKey || !validateForm()) return;
 
-    // Check if wallet methods are available
     if (!signTransaction || !signMessage) {
       console.error('Wallet methods not available');
       alert('Wallet not properly connected. Please reconnect your wallet.');
@@ -101,7 +100,6 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
     try {
       setMintingState({ isLoading: true, status: 'uploading', progress: 0 });
 
-      // 1) Upload image to Pinata
       const imageFile = formData.image!;
       const imageUpload = await ipfsService.uploadFileWithProgress(imageFile, (p) => {
         const mapped = Math.min(70, Math.max(0, Math.round(p.percentage * 0.7)));
@@ -111,7 +109,6 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
       const pinataUrl = ipfsService.getIPFSUrl(imageUpload.IpfsHash);
       setMintingState({ status: 'encrypting', progress: 75 });
 
-      // 2) Encrypt the Pinata URL client-side
       const unlockTimestamp = Math.floor(new Date(formData.unlockDate).getTime() / 1000);
       const encryptedData = await encryptionService.encryptPinataUrl(
         pinataUrl,
@@ -123,7 +120,6 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
 
       setMintingState({ status: 'minting', progress: 85 });
 
-      // 3) Create capsule on Solana
       const capsuleData: CapsuleData = {
         title: formData.name,
         content: JSON.stringify({
@@ -153,7 +149,6 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
         signature: result.signature
       });
 
-      // Add to local store
       addCapsule({
         id: result.capsuleAddress,
         mint: '',
@@ -173,29 +168,22 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
         }
       });
 
-      // Show success toast
       toast.success('🎉 Memory capsule created successfully! Switching to My Capsules...', {
         duration: 4000,
       });
 
-      // Reset minting state after successful creation
       setTimeout(() => {
         resetMinting();
-      }, 2000); // Keep success message visible for 2 seconds
+      }, 2000);
 
-      // Notify parent component that capsule was created
       if (onCapsuleCreated) {
         onCapsuleCreated();
       }
-
-      // Don't show mint prompt immediately - user can mint after unlock
-      // setShowMintPrompt(true);
 
     } catch (error) {
       console.error('Error creating capsule:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       
-      // Show error toast
       toast.error(`❌ Failed to create capsule: ${errorMessage}`, {
         duration: 5000,
       });
@@ -214,14 +202,10 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
     try {
       setMintingState({ isLoading: true, status: 'minting', progress: 0 });
 
-      // Prepare mint options
       const mintOptions: CNFTMintOptions = {
         useCompressedNFT: mintAsCompressed,
-        // Optional: specify tree address if you have a specific tree
-        // treeAddress: 'your-tree-address-here'
       };
 
-      // Mint NFT using the NFT service (compressed or regular based on option)
       const mintResult = await nftService.mintCapsule(
         {
           publicKey,
@@ -248,14 +232,9 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
         mint: mintResult.mint
       });
 
-      // Update the capsule with mint information
-
-
-      // Close the mint prompt
       setShowMintPrompt(false);
       setCreatedCapsule(null);
 
-      // Reset form
       setFormData({
         name: '',
         description: '',
@@ -280,7 +259,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
     setCreatedCapsule(null);
     resetMinting();
     
-    // Reset form
+    
     setFormData({
       name: '',
       description: '',
@@ -327,7 +306,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
               Would you like to mint this capsule as an NFT?
             </p>
             
-            {/* NFT Type Selection */}
+            {}
             <div className="mb-6 space-y-3">
               <div className="flex items-center justify-center gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -352,7 +331,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
                 </label>
               </div>
               
-              {/* Explanation */}
+              {}
               <div className="text-xs text-gray-500 max-w-md mx-auto">
                 {mintAsCompressed ? (
                   <p>
@@ -411,7 +390,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
       </CardHeader>
 
       <CardContent className="space-y-6 p-4 md:p-6">
-        {/* Image Upload */}
+        {}
         <div className="space-y-2">
           <label className="text-sm font-medium">Capsule Image</label>
           <div
@@ -438,7 +417,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
           </div>
         </div>
 
-        {/* Form Fields */}
+        {}
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium">Capsule Name</label>
@@ -476,7 +455,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
           </div>
         </div>
 
-        {/* Error Display */}
+        {}
         {errors.length > 0 && (
           <div className="space-y-2">
             {errors.map((error, index) => (
@@ -488,7 +467,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
           </div>
         )}
 
-        {/* Progress Display */}
+        {}
         {minting.isLoading && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
@@ -508,7 +487,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
           </div>
         )}
 
-        {/* Action Buttons */}
+        {}
         <div className="flex gap-3">
           <Button
             onClick={handleCreateCapsule}
@@ -529,7 +508,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
           </Button>
         </div>
 
-        {/* Success Message */}
+        {}
         {minting.status === 'success' && (
           <div className="flex items-center gap-2 text-green-600 text-sm">
             <CheckCircle className="h-4 w-4" />
@@ -537,7 +516,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
           </div>
         )}
 
-        {/* Error Message */}
+        {}
         {minting.status === 'error' && minting.error && (
           <div className="flex items-center gap-2 text-red-600 text-sm">
             <AlertCircle className="h-4 w-4" />

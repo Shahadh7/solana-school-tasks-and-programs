@@ -11,7 +11,6 @@
 import { PublicKey } from '@solana/web3.js'
 import { heliusWebSocket } from './helius-websocket'
 
-// DAS API Response Types
 export interface DasApiAsset {
   interface: string
   id: string
@@ -128,9 +127,8 @@ class HeliusDasService {
 
   constructor() {
     this.apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY || ''
-    // Use the correct Helius RPC endpoint for DAS API
-    this.baseUrl = process.env.NEXT_PUBLIC_HELIUS_DAS_URL || 'https://devnet.helius-rpc.com'
-    this.rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 'https://devnet.helius-rpc.com'
+    this.baseUrl = process.env.NEXT_PUBLIC_HELIUS_DAS_URL || 'https://api.helius.xyz';
+    this.rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 'https://api.devnet.solana.com';
     
     if (!this.apiKey) {
       console.warn('Helius API key not found. DAS API functionality will be limited.')
@@ -280,7 +278,6 @@ class HeliusDasService {
         }
       })
 
-      // Filter for compressed NFTs that are memory capsules
       const capsuleNFTs = response.items.filter(asset => {
         const isCompressed = asset.compression?.compressed === true
         const isCapsule = asset.content?.metadata?.name?.toLowerCase().includes('capsule') ||
@@ -310,14 +307,12 @@ class HeliusDasService {
     try {
       console.log('Starting transaction monitoring for:', signature)
       
-      // Initial status
       onUpdate({
         signature,
         status: 'pending',
         timestamp: Date.now()
       })
 
-      // Set up WebSocket monitoring
       const subscriptionId = await heliusWebSocket.subscribeToTransaction(
         signature,
         (confirmation) => {
@@ -326,7 +321,6 @@ class HeliusDasService {
             const result = confirmationData.result as Record<string, unknown>
 
             if (result?.err) {
-              // Transaction failed
               onUpdate({
                 signature,
                 status: 'failed',
@@ -334,14 +328,11 @@ class HeliusDasService {
                 timestamp: Date.now()
               })
             } else {
-              // Transaction confirmed - try to extract asset ID
               const logs = (result?.meta as Record<string, unknown>)?.logMessages || []
               let assetId: string | undefined
 
-              // Look for asset ID in logs (this is a simplified extraction)
               for (const log of logs) {
                 if (typeof log === 'string' && log.includes('Instruction: MintV1')) {
-                  // In a real implementation, you'd parse the transaction more thoroughly
                   assetId = `asset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
                   break
                 }
@@ -367,7 +358,6 @@ class HeliusDasService {
         'confirmed'
       )
 
-      // Set timeout for transaction confirmation
       setTimeout(async () => {
         try {
           await heliusWebSocket.unsubscribeFromTransaction(subscriptionId)
@@ -380,7 +370,7 @@ class HeliusDasService {
         } catch (error) {
           console.error('Error cleaning up transaction subscription:', error)
         }
-      }, 60000) // 60 second timeout
+      }, 60000) 
 
     } catch (error) {
       console.error('Failed to monitor transaction:', error)
@@ -463,7 +453,6 @@ class HeliusDasService {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      // Simple health check - try to fetch a known endpoint
       const response = await fetch(`${this.getDasUrl()}/health?api-key=${this.apiKey}`)
       return response.ok
     } catch (error) {
@@ -487,14 +476,12 @@ class HeliusDasService {
     }
   }
 
-  // Get transaction signatures for an asset (NFT)
   async getSignaturesForAsset(assetId: string): Promise<{
     total: number;
     limit: number;
-    items: Array<[string, string]>; // [signature, operation_type]
+    items: Array<[string, string]>; 
   }> {
     try {
-      // Use the correct Helius DAS API endpoint structure
       const response = await fetch(`${this.baseUrl}/v0/signatures?api-key=${this.apiKey}`, {
         method: 'POST',
         headers: {
@@ -541,16 +528,14 @@ class HeliusDasService {
     try {
       console.log('Searching for cNFTs matching capsule name:', capsuleName)
       
-      // First get all assets owned by the wallet
       const allAssets = await this.getAssetsByOwner(ownerAddress, {
         limit: 1000,
         displayOptions: {
-          showFungible: false, // We only want NFTs
+          showFungible: false, 
           showNativeBalance: false
         }
       });
       
-      // Filter for compressed NFTs that match the capsule name
       const matchingCNFTs = allAssets.items.filter(asset => {
         const isCompressed = asset.compression?.compressed === true;
         const nameMatches = asset.content?.metadata?.name === capsuleName;
@@ -567,8 +552,6 @@ class HeliusDasService {
   }
 }
 
-// Export singleton instance
 export const heliusDasService = new HeliusDasService()
 
-// Export types and service class
 export { HeliusDasService }

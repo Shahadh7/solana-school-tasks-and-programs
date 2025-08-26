@@ -10,13 +10,13 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
 
-// Configuration
-const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_URL || 'https://api.devnet.solana.com'
+
+const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_URL || 'https:
 const TREE_CONFIG = {
-  maxDepth: 14,        // Supports up to 16,384 cNFTs (2^14)
-  maxBufferSize: 64,   // Buffer size for concurrent operations
-  canopyDepth: 0,      // No canopy for simplicity (can be increased for cheaper transfers)
-  public: true         // Allow anyone to mint to this tree
+  maxDepth: 14,        
+  maxBufferSize: 64,   
+  canopyDepth: 0,      
+  public: true         
 }
 
 async function createMerkleTree() {
@@ -27,21 +27,21 @@ async function createMerkleTree() {
     console.log('Tree Config:', TREE_CONFIG)
     console.log('')
 
-      // Initialize UMI
+      
   const umi = createUmi(RPC_ENDPOINT)
 
-    // Load or create admin keypair
+    
     const adminKeypair = await loadOrCreateAdminKeypair()
     umi.use(keypairIdentity(adminKeypair))
 
     console.log('Admin wallet:', adminKeypair.publicKey.toString())
     console.log('')
 
-    // Generate a new keypair for the tree
+    
     const merkleTree = generateSigner(umi)
     console.log('Generated tree address:', merkleTree.publicKey.toString())
 
-    // Create the tree transaction
+    
     console.log('Creating tree transaction...')
     const createTreeTx = createTree(umi, {
       merkleTree,
@@ -52,7 +52,7 @@ async function createMerkleTree() {
       public: TREE_CONFIG.public,
     })
 
-    // Send and confirm the transaction
+    
     console.log('Sending transaction...')
     const result = await (await createTreeTx).sendAndConfirm(umi, {
       send: { commitment: 'confirmed' },
@@ -67,7 +67,7 @@ async function createMerkleTree() {
     console.log('Capacity:', Math.pow(2, TREE_CONFIG.maxDepth), 'cNFTs')
     console.log('')
 
-    // Save tree configuration
+    
     await saveTreeConfig({
       treeAddress: merkleTree.publicKey.toString(),
       signature: result.signature.toString(),
@@ -108,12 +108,12 @@ async function loadOrCreateAdminKeypair() {
     console.log('Could not load existing keypair, creating new one...')
   }
 
-  // Create new keypair
+  
   console.log('Generating new admin keypair...')
   const umi = createUmi(RPC_ENDPOINT)
   const keypair = generateSigner(umi)
   
-  // Save keypair
+  
   fs.writeFileSync(keypairPath, JSON.stringify(Array.from(keypair.secretKey)))
   console.log('✅ Admin keypair saved to:', keypairPath)
   console.log('⚠️  IMPORTANT: Fund this wallet with SOL before creating the tree!')
@@ -128,12 +128,12 @@ async function saveTreeConfig(config: any) {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2))
 }
 
-// ES module compatibility
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Run the script if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+
+if (import.meta.url === `file:
   createMerkleTree()
     .then(() => {
       console.log('Script completed successfully!')

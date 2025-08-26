@@ -21,7 +21,7 @@ import * as path from 'path';
 import bs58 from 'bs58';
 import { fileURLToPath } from 'url';
 
-const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_URL || 'https://api.devnet.solana.com';
+const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_URL || 'https:
 
 function printUsage() {
   console.log(`
@@ -57,7 +57,6 @@ function generateNewKeypair() {
   const secretKeyArray = Array.from(signer.secretKey);
   const publicKey = signer.publicKey.toString();
   
-  // Save to admin-keypair.json
   const outputPath = path.join(__dirname, 'admin-keypair.json');
   fs.writeFileSync(outputPath, JSON.stringify(secretKeyArray, null, 2));
   
@@ -78,11 +77,9 @@ function convertFromSecret(base58Secret: string) {
   try {
     console.log('🔄 Converting base58 secret key to JSON array...\n');
     
-    // Decode base58 secret key
     const secretKeyBytes = bs58.decode(base58Secret);
     const secretKeyArray = Array.from(secretKeyBytes);
     
-    // Derive public key
     const keypair = Keypair.fromSecretKey(secretKeyBytes);
     const publicKey = keypair.publicKey.toString();
     
@@ -112,13 +109,11 @@ function convertFromFile(filePath: string) {
     let secretKeyArray: number[];
     
     try {
-      // Try to parse as JSON array first
       secretKeyArray = JSON.parse(fileContent);
       if (!Array.isArray(secretKeyArray) || secretKeyArray.length !== 64) {
         throw new Error('Invalid JSON array format');
       }
     } catch (jsonError) {
-      // Try to parse as base58 string
       try {
         const base58Key = fileContent.trim();
         const secretKeyBytes = bs58.decode(base58Key);
@@ -128,7 +123,6 @@ function convertFromFile(filePath: string) {
       }
     }
     
-    // Derive public key
     const keypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
     const publicKey = keypair.publicKey.toString();
     
@@ -181,16 +175,13 @@ function main() {
     return;
   }
   
-  // Default: generate new keypair
   generateNewKeypair();
 }
 
-// ES module compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Run the script if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === `file:
   main();
 }
 

@@ -26,19 +26,16 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
   const [recentActivity, setRecentActivity] = useState<number>(0);
   const [wsInfo, setWsInfo] = useState<ReturnType<typeof getWebSocketInfo> | null>(null);
 
-  // Get WebSocket configuration info
   useEffect(() => {
     setWsInfo(getWebSocketInfo());
   }, []);
 
   useEffect(() => {
-    // Count recent activity
     const now = Date.now();
     const fiveMinutesAgo = now - 5 * 60 * 1000;
     
     let activityCount = 0;
     
-    // Count recent account updates
     Object.values(accountUpdates).forEach((update: unknown) => {
       if (update && typeof update === 'object' && 'timestamp' in update) {
         if ((update as { timestamp: number }).timestamp > fiveMinutesAgo) {
@@ -47,7 +44,6 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
       }
     });
     
-    // Count recent transaction updates
     Object.values(transactionStatuses).forEach((status: unknown) => {
       if (status && typeof status === 'object' && 'timestamp' in status) {
         if ((status as { timestamp: number }).timestamp > fiveMinutesAgo) {
@@ -60,7 +56,7 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
   }, [accountUpdates, transactionStatuses]);
 
   if (!showDetailed && !isUsingHelius()) {
-    return null; // Don't show for non-Helius connections unless detailed view
+    return null;
   }
 
   const ConnectionIcon = isConnected ? Wifi : WifiOff;
@@ -68,7 +64,6 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
   const connectionStatus = isConnected ? 'Connected' : 'Disconnected';
 
   if (!showDetailed) {
-    // Compact status indicator
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         <ConnectionIcon className={`h-4 w-4 ${connectionColor}`} />
@@ -90,7 +85,6 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
     );
   }
 
-  // Detailed status card
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
@@ -100,7 +94,7 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Connection Status */}
+        {}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ConnectionIcon className={`h-4 w-4 ${connectionColor}`} />
@@ -119,7 +113,6 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
           </div>
         </div>
 
-        {/* WebSocket Configuration */}
         {wsInfo && (
           <div className="space-y-2">
             <div className="text-sm font-medium">WebSocket Configuration</div>
@@ -138,7 +131,6 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
           </div>
         )}
 
-        {/* Current Slot */}
         {currentSlot && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600">Current Slot:</span>
@@ -146,7 +138,6 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
           </div>
         )}
 
-        {/* Active Subscriptions */}
         {status && (
           <div className="space-y-2">
             <div className="text-sm font-medium">Active Subscriptions</div>
@@ -167,7 +158,6 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
           </div>
         )}
 
-        {/* Recent Activity */}
         {recentActivity > 0 && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600">Recent Activity:</span>
@@ -177,7 +167,6 @@ export function WebSocketStatus({ showDetailed = false, className = '' }: WebSoc
           </div>
         )}
 
-        {/* Performance Indicator */}
         {isUsingHelius() && (
           <div className={`text-xs rounded p-2 ${
             isConnected ? 'text-green-600 bg-green-50' : 'text-yellow-600 bg-yellow-50'

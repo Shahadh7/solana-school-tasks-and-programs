@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs"; // we need Node fetch + FormData
+export const runtime = "nodejs"; 
 
 export async function POST(req: NextRequest) {
   const jwt = process.env.PINATA_JWT;
@@ -18,11 +18,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing 'file' in form-data" }, { status: 400 });
   }
 
-  // Build Pinata multipart/form-data
   const pinataForm = new FormData();
   pinataForm.append("file", file, file.name);
 
-  // Optional: add metadata & options
   pinataForm.append(
     "pinataMetadata",
     JSON.stringify({
@@ -36,11 +34,10 @@ export async function POST(req: NextRequest) {
   );
   pinataForm.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
 
-  // Upload to Pinata
   const res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${jwt}`, // no Content-Type on purpose; fetch sets boundary
+      Authorization: `Bearer ${jwt}`, 
     },
     body: pinataForm,
   });

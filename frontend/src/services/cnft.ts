@@ -24,13 +24,10 @@ import {
   MetadataArgsArgs,
 } from '@metaplex-foundation/mpl-bubblegum'
 import bs58 from 'bs58'
-// Import DAS API types from Helius service
 import { heliusDasService, DasApiAsset, MintTransactionStatus } from './helius-das'
 import { PublicKey } from '@solana/web3.js'
-// Import transfer instruction
 const { transfer } = await import('@metaplex-foundation/mpl-bubblegum/dist/src/generated/instructions/transfer');
 
-// Types for the service
 export interface CNFTMetadata {
   name: string
   description: string
@@ -88,13 +85,10 @@ class CNFTService {
   private defaultTreeAddress?: UmiPublicKey
 
   constructor(rpcEndpoint?: string) {
-    // Use Helius RPC endpoint with fallback to Solana mainnet
-    this.rpcEndpoint = rpcEndpoint || process.env.NEXT_PUBLIC_RPC_URL || 'https://api.mainnet-beta.solana.com'
+    this.rpcEndpoint = rpcEndpoint || process.env.NEXT_PUBLIC_RPC_URL || 'https://api.devnet.solana.com';
     
-    // Initialize UMI with bundle defaults
     this.umi = createUmiWithDefaults(this.rpcEndpoint)
 
-    // Set default tree from environment variable if available
     const envTreeAddress = process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS
     if (envTreeAddress) {
       this.defaultTreeAddress = createPublicKey(envTreeAddress)
@@ -106,7 +100,6 @@ class CNFTService {
    */
   async initialize(wallet: Wallet): Promise<void> {
     try {
-      // Set up wallet adapter identity with proper type handling
       const walletAdapter = walletAdapterIdentity({
         publicKey: wallet.publicKey,
         signTransaction: wallet.signTransaction,
@@ -132,18 +125,16 @@ class CNFTService {
   }): Promise<TreeInfo> {
     try {
       const {
-        maxDepth = 14,        // Supports up to 16,384 cNFTs (2^14)
-        maxBufferSize = 64,   // Buffer size for concurrent operations
-        canopyDepth = 0,      // Canopy depth for cheaper transfers (0 = no canopy)
-        public: isPublic = true  // Whether anyone can mint to this tree
+        maxDepth = 14,        
+        maxBufferSize = 64,   
+        canopyDepth = 0,      
+        public: isPublic = true  
       } = params || {}
 
 
 
-      // Generate a new keypair for the tree
       const merkleTree = generateSigner(this.umi)
       
-      // Create the tree transaction
       const createTreeTx = createTree(this.umi, {
         merkleTree,
         maxDepth,
@@ -153,16 +144,13 @@ class CNFTService {
         public: isPublic,
       })
 
-      // Send and confirm the transaction
       const result = await (await createTreeTx).sendAndConfirm(this.umi, {
         send: { commitment: 'confirmed' },
         confirm: { commitment: 'confirmed' }
       })
 
-      // Calculate capacity
       const totalCapacity = Math.pow(2, maxDepth)
       
-      // Store the tree address for future use
       this.defaultTreeAddress = merkleTree.publicKey
 
       return {
@@ -183,8 +171,6 @@ class CNFTService {
    */
   private async uploadMetadataToIPFS(metadata: CNFTMetadata): Promise<string> {
     try {
-      // In a real implementation, you would use your IPFS service
-      // For now, we'll simulate this or integrate with the existing ipfsService
       const { ipfsService } = await import('./ipfs')
       
       const metadataUpload = await ipfsService.uploadJSON(
@@ -221,7 +207,6 @@ class CNFTService {
     onProgress?: (step: string, progress: number) => void
   ): Promise<CNFTMintResult> {
     try {
-      // Use provided tree or default tree
       const merkleTree = treeAddress || this.defaultTreeAddress
       if (!merkleTree) {
         throw new Error('No Merkle tree specified. Create a tree first or provide a tree address.')
@@ -229,12 +214,10 @@ class CNFTService {
 
       onProgress?.('Uploading image to IPFS...', 20)
 
-      // Upload image to IPFS
       const imageUrl = await this.uploadImageToIPFS(params.image)
 
       onProgress?.('Creating metadata...', 40)
 
-      // Prepare metadata
       const metadata: CNFTMetadata = {
         name: params.name,
         description: params.description,
@@ -247,24 +230,22 @@ class CNFTService {
         ]
       }
 
-      // Upload metadata to IPFS
       const metadataUri = await this.uploadMetadataToIPFS(metadata)
 
       onProgress?.('Minting compressed NFT...', 70)
 
-      // Prepare metadata arguments for Bubblegum
       const metadataArgs: MetadataArgsArgs = {
         name: params.name,
         symbol: 'CAPSULE',
         uri: metadataUri,
-        sellerFeeBasisPoints: 0, // No royalties for memory capsules
+        sellerFeeBasisPoints: 0, 
         primarySaleHappened: false,
         isMutable: true,
         editionNonce: some(0),
-        tokenStandard: some(0), // NonFungible
-        collection: none(), // Collection support can be added later
+        tokenStandard: some(0), 
+        collection: none(), 
         uses: none(),
-        tokenProgramVersion: 0, // Token Program
+        tokenProgramVersion: 0, 
         creators: [
           {
             address: this.umi.identity.publicKey,
@@ -274,13 +255,11 @@ class CNFTService {
         ],
       }
 
-      // Determine the leaf owner (recipient or current user)
       const leafOwner = params.recipient 
         ? createPublicKey(params.recipient)
         : this.umi.identity.publicKey
 
 
-      // Create mint transaction
       const mintTx = mintV1(this.umi, {
         leafOwner,
         merkleTree,
@@ -289,7 +268,6 @@ class CNFTService {
 
       onProgress?.('Confirming transaction...', 90)
 
-      // Send and confirm the transaction
       const result = await mintTx.sendAndConfirm(this.umi, {
         send: { commitment: 'confirmed' },
         confirm: { commitment: 'confirmed' }
@@ -297,7 +275,6 @@ class CNFTService {
 
       onProgress?.('cNFT minted successfully!', 100)
 
-      // Convert signature to proper base58 string for Solscan compatibility
       let signature: string;
       try {
         if (result.signature instanceof Uint8Array) {
@@ -311,11 +288,9 @@ class CNFTService {
         signature = String(result.signature);
       }
 
-      // Use the transaction signature as the asset identifier for verification
       const assetId = signature
 
 
-      // Set up WebSocket monitoring for real-time updates
       if (onProgress) {
         onProgress('Monitoring transaction confirmation...', 95)
         
@@ -324,17 +299,15 @@ class CNFTService {
           if (status.status === 'confirmed') {
             onProgress('cNFT minted and confirmed!', 100)
           } else if (status.status === 'failed') {
-            // Transaction failed
           }
         }).catch(error => {
-          // Failed to monitor transaction
         })
       }
 
       return {
         signature,
         assetId,
-        leafIndex: 0, // This would be derived from the transaction logs in a real implementation
+        leafIndex: 0, 
         metadata: {
           ...metadata,
           imageUrl,
@@ -358,7 +331,6 @@ class CNFTService {
     proof?: UmiPublicKey[]
   }): Promise<string> {
     try {
-      // Convert newOwner to UMI public key if it's a string
       const newOwnerKey = typeof params.newOwner === 'string' 
         ? createPublicKey(params.newOwner)
         : params.newOwner;
@@ -370,33 +342,27 @@ class CNFTService {
         leafIndex: params.leafIndex
       });
 
-      // Fetch asset data from DAS API
       const asset = await heliusDasService.getAsset(params.assetId);
       if (!asset) {
         throw new Error('Asset not found in DAS API');
       }
 
-      // Validate asset is compressed
       if (!asset.compression?.compressed) {
         throw new Error('Asset is not a compressed NFT');
       }
 
-      // Get merkle tree address from asset data
       const merkleTree = params.merkleTree || createPublicKey(asset.compression.tree);
       const leafIndex = params.leafIndex || asset.compression.leaf_id;
 
-      // Fetch merkle proof from DAS API
       const proofData = await heliusDasService.getAssetProof(params.assetId);
       if (!proofData) {
         throw new Error('Failed to fetch merkle proof for asset transfer');
       }
 
-      // Convert proof strings to UMI public keys
       const proof = proofData.proof.map(p => createPublicKey(p));
 
       
 
-      // Create transfer transaction
       const transferTx = transfer(this.umi, {
         leafOwner: this.umi.identity.publicKey,
         newLeafOwner: newOwnerKey,
@@ -411,13 +377,11 @@ class CNFTService {
 
       console.log('Sending transfer transaction...');
 
-      // Send and confirm the transaction
       const result = await transferTx.sendAndConfirm(this.umi, {
         send: { commitment: 'confirmed' },
         confirm: { commitment: 'confirmed' }
       });
 
-      // Convert signature to base58 string
       let signature: string;
       try {
         if (result.signature instanceof Uint8Array) {
@@ -446,15 +410,12 @@ class CNFTService {
   async fetchWalletCNFTs(ownerAddress: UmiPublicKey): Promise<DasApiAsset[]> {
     try {
 
-      // Convert UMI PublicKey to standard PublicKey for DAS API
       const publicKey = new PublicKey(ownerAddress.toString())
       
-      // Use Helius DAS API to fetch capsule cNFTs
       const assets = await heliusDasService.getCapsuleNFTs(publicKey)
       
       return assets
     } catch (error) {
-      // Return empty array on error to prevent UI breaks
       return []
     }
   }
@@ -465,7 +426,6 @@ class CNFTService {
   async fetchCNFT(assetId: UmiPublicKey): Promise<DasApiAsset | null> {
     try {
 
-      // Use Helius DAS API to fetch specific asset
       const asset = await heliusDasService.getAsset(assetId.toString())
       
       return asset
@@ -479,10 +439,7 @@ class CNFTService {
    */
   async getTreeInfo(treeAddress: UmiPublicKey): Promise<TreeInfo | null> {
     try {
-      // In a real implementation, you would fetch tree account data
-      // For now, return basic info
       
-      // This is a placeholder - in reality you'd fetch the actual tree account
       return {
         treeAddress,
         maxDepth: 14,
@@ -531,13 +488,11 @@ class CNFTService {
     if (!params.unlockDate) {
       errors.push('Unlock date is required')
     } else if (!isForUnlockedCapsule && params.unlockDate <= new Date()) {
-      // Only validate future date for new capsules, not for minting existing unlocked ones
       errors.push('Unlock date must be in the future')
     }
 
-    // Validate image file
     if (params.image) {
-      const maxSize = 10 * 1024 * 1024 // 10MB
+      const maxSize = 10 * 1024 * 1024 
       if (params.image.size > maxSize) {
         errors.push('Image file must be smaller than 10MB')
       }
@@ -586,8 +541,6 @@ class CNFTService {
   }
 }
 
-// Export singleton instance
 export const cnftService = new CNFTService()
 
-// Export types and service class
 export { CNFTService }

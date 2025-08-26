@@ -19,7 +19,6 @@ class IPFSService {
     this.pinataGateway =
       process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gateway.pinata.cloud";
     if (!process.env.NEXT_PUBLIC_PINATA_GATEWAY) {
-      // Not an error; project can still work on the shared gateway
     }
   }
 
@@ -28,7 +27,6 @@ class IPFSService {
     return `${this.pinataGateway}/ipfs/${cid}`;
   }
 
-  /** Simple upload (no progress) — proxies to our Next.js API */
   async uploadFile(file: File): Promise<PinataUploadResponse> {
     const formData = new FormData();
     formData.set("file", file);
@@ -37,7 +35,6 @@ class IPFSService {
     return res.json();
   }
 
-  /** Upload with progress (browser only) */
   uploadFileWithProgress(
     file: File,
     onProgress: (p: UploadProgress) => void
@@ -73,7 +70,6 @@ class IPFSService {
     });
   }
 
-  /** Upload JSON metadata via our server route */
   async uploadJSON(metadata: object, filename = "metadata.json"): Promise<PinataUploadResponse> {
     const res = await fetch("/api/json", {
       method: "POST",
@@ -84,7 +80,6 @@ class IPFSService {
     return res.json();
   }
 
-  /** Create Metaplex-compatible metadata object */
   createNFTMetadata(params: {
     name: string;
     description: string;
@@ -92,7 +87,7 @@ class IPFSService {
     unlockDate: Date;
     attributes?: Array<{ trait_type: string; value: string }>;
     creatorAddress?: string;
-    mimeType?: string; // e.g., "image/png"
+    mimeType?: string;
     externalUrl?: string;
   }) {
     const {
@@ -103,7 +98,7 @@ class IPFSService {
       attributes = [],
       creatorAddress,
       mimeType = "image/png",
-      externalUrl = "https://dearfuture.app",
+      externalUrl = "https://dearfuture.xyz"
     } = params;
 
     const image = this.getIPFSUrl(imageCidOrHash);

@@ -107,7 +107,6 @@ class SolanaService {
     
     const [configPda] = this.findConfigPDA();
     
-    // Get current capsule count
     let capsuleId = 0;
     try {
       const configAccount = await (program.account as Record<string, unknown>)['config'].fetch(configPda);
@@ -265,7 +264,6 @@ class SolanaService {
     } catch (error) {
       console.error('Transfer capsule error:', error);
       
-      // Provide more specific error messages
       if (error instanceof Error) {
         if (error.message.includes('Invalid public key input')) {
           throw new Error(`Invalid address format. Please check: ${newOwner}`);
@@ -289,7 +287,6 @@ class SolanaService {
 
     
     try {
-      // Try to use Anchor's account query first
       const allCapsules = await (program.account as Record<string, unknown>)['capsule'].all();
 
       
@@ -300,19 +297,16 @@ class SolanaService {
       
 
       
-      // Transform to the expected format
       const capsules = userCapsules.map((capsule: Record<string, unknown>) => ({
         address: capsule.publicKey.toString(),
         ...capsule.account,
       }));
       
-      // Sort capsules by creation date (newest first)
       capsules.sort((a: Record<string, unknown>, b: Record<string, unknown>) => b.createdAt.toNumber() - a.createdAt.toNumber());
       
       return capsules;
     } catch {
       
-      // Fallback to RPC method
       const accounts = await this.connection.getProgramAccounts(this.programId);
 
 
@@ -322,7 +316,6 @@ class SolanaService {
           const capsuleData = await (program.account as Record<string, unknown>)['capsule'].fetch(account.pubkey);
 
           
-          // Include capsules created by or owned by the current wallet
           if (capsuleData.creator.toString() === wallet.publicKey.toString() ||
               capsuleData.owner.toString() === wallet.publicKey.toString()) {
             capsules.push({
@@ -332,14 +325,12 @@ class SolanaService {
 
           }
         } catch {
-          // Skip accounts that aren't capsule accounts
           continue;
         }
       }
 
 
 
-      // Sort capsules by creation date (newest first)
       capsules.sort((a: Record<string, unknown>, b: Record<string, unknown>) => b.createdAt.toNumber() - a.createdAt.toNumber());
 
       return capsules;
