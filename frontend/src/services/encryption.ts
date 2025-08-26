@@ -135,7 +135,7 @@ export class EncryptionService {
         decryptedUrl
       };
     } catch (error) {
-      console.log('Failed to decrypt with original creator key for transferred capsule:', error);
+      // Failed to decrypt with original creator key for transferred capsule
       return null;
     }
   }
@@ -158,7 +158,7 @@ export class EncryptionService {
       
       return null;
     } catch (error) {
-      console.log('Failed to extract IPFS hash from encrypted data:', error);
+      // Failed to extract IPFS hash from encrypted data
       return null;
     }
   }

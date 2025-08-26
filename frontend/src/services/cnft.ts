@@ -335,12 +335,7 @@ class CNFTService {
         ? createPublicKey(params.newOwner)
         : params.newOwner;
 
-      console.log('Starting cNFT transfer:', {
-        assetId: params.assetId,
-        newOwner: newOwnerKey.toString(),
-        merkleTree: params.merkleTree?.toString(),
-        leafIndex: params.leafIndex
-      });
+      // Starting cNFT transfer
 
       const asset = await heliusDasService.getAsset(params.assetId);
       if (!asset) {
@@ -375,7 +370,7 @@ class CNFTService {
         proof,
       });
 
-      console.log('Sending transfer transaction...');
+      // Sending transfer transaction
 
       const result = await transferTx.sendAndConfirm(this.umi, {
         send: { commitment: 'confirmed' },
@@ -395,7 +390,7 @@ class CNFTService {
         signature = String(result.signature);
       }
 
-      console.log('cNFT transfer successful:', signature);
+      // cNFT transfer successful
 
       return signature;
     } catch (error) {

@@ -164,7 +164,9 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
             { trait_type: 'Category', value: 'Personal Memory' },
             { trait_type: 'Unlock Date', value: formData.unlockDate },
             { trait_type: 'Created At', value: new Date().toISOString() }
-          ]
+          ],
+          transactionId: result.signature,
+          creator: publicKey.toString()
         }
       });
 
@@ -226,11 +228,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
 
       setMintingState({ status: 'success', progress: 100 });
 
-      console.log(`${mintAsCompressed ? 'Compressed' : 'Regular'} NFT minted successfully:`, {
-        signature: mintResult.signature,
-        assetId: mintResult.assetId,
-        mint: mintResult.mint
-      });
+      // NFT minted successfully
 
       setShowMintPrompt(false);
       setCreatedCapsule(null);

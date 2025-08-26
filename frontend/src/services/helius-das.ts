@@ -169,7 +169,7 @@ class HeliusDasService {
    */
   async getAsset(assetId: string): Promise<DasApiAsset | null> {
     try {
-      console.log('Fetching asset:', assetId)
+      // Fetching asset silently
       
       const response = await fetch(`${this.baseUrl}/?api-key=${this.apiKey}`, {
         method: 'POST',
@@ -208,7 +208,7 @@ class HeliusDasService {
     options: AssetsByOwnerOptions = {}
   ): Promise<DasApiResponse<DasApiAsset>> {
     try {
-      console.log('Fetching assets for owner:', ownerAddress)
+      // Fetching assets for owner silently
       
       const {
         page = 1,
@@ -257,7 +257,7 @@ class HeliusDasService {
       }
 
       const result = data.result;
-      console.log(`Found ${result.total} assets for owner`);
+      // Found assets for owner silently
       return result;
     } catch (error) {
       console.error('Failed to fetch assets by owner:', error)
@@ -289,7 +289,7 @@ class HeliusDasService {
         return isCompressed && isCapsule
       })
 
-      console.log(`Found ${capsuleNFTs.length} capsule cNFTs for wallet`)
+      // Found capsule cNFTs for wallet silently
       return capsuleNFTs
     } catch (error) {
       console.error('Failed to fetch capsule cNFTs:', error)
@@ -305,7 +305,7 @@ class HeliusDasService {
     onUpdate: (status: MintTransactionStatus) => void
   ): Promise<void> {
     try {
-      console.log('Starting transaction monitoring for:', signature)
+      // Starting transaction monitoring silently
       
       onUpdate({
         signature,
@@ -395,7 +395,7 @@ class HeliusDasService {
     tree_id: string
   } | null> {
     try {
-      console.log('Fetching proof for asset:', assetId);
+      // Fetching proof for asset silently
       
       const response = await fetch(`${this.baseUrl}/?api-key=${this.apiKey}`, {
         method: 'POST',
@@ -419,7 +419,7 @@ class HeliusDasService {
         throw new Error(`DAS API error: ${data.error.message}`);
       }
 
-      console.log('Asset proof fetched successfully:', data.result);
+      // Asset proof fetched successfully
       return data.result;
     } catch (error) {
       console.error('Failed to fetch asset proof:', error);
@@ -526,7 +526,7 @@ class HeliusDasService {
     capsuleName: string
   ): Promise<DasApiAsset[]> {
     try {
-      console.log('Searching for cNFTs matching capsule name:', capsuleName)
+      // Searching for cNFTs matching capsule name silently
       
       const allAssets = await this.getAssetsByOwner(ownerAddress, {
         limit: 1000,
@@ -543,7 +543,7 @@ class HeliusDasService {
         return isCompressed && nameMatches;
       });
       
-      console.log(`Found ${matchingCNFTs.length} cNFTs matching capsule name "${capsuleName}"`);
+      // Found matching cNFTs silently
       return matchingCNFTs;
     } catch (error) {
       console.error('Failed to search cNFTs by capsule name:', error)

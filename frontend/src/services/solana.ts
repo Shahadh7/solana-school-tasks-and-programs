@@ -43,7 +43,7 @@ class SolanaService {
 
   constructor() {
     this.connection = createOptimizedConnection();
-    this.programId = new PublicKey('4UHykQD4g6ANrhZXYnKtECq9dq4HxV3JbFCkkRE4krX5');
+    this.programId = new PublicKey(process.env.NEXT_PUBLIC_PROGRAM_ID || '4UHykQD4g6ANrhZXYnKtECq9dq4HxV3JbFCkkRE4krX5');
     this.provider = {} as AnchorProvider;
   }
 
@@ -218,31 +218,21 @@ class SolanaService {
     const program = this.getProgram();
     
     try {
-      console.log('Transfer capsule inputs (capsule only):', {
-        capsuleAddress,
-        newOwner,
-        mintAddress: mintAddress || 'none (capsule-only transfer)',
-        currentOwner: wallet.publicKey.toString()
-      });
+      // Transfer capsule inputs logged silently
 
       const capsulePubkey = new PublicKey(capsuleAddress);
-      console.log('Capsule pubkey:', capsulePubkey.toString());
-      
       const newOwnerPubkey = new PublicKey(newOwner);
-      console.log('New owner pubkey:', newOwnerPubkey.toString());
       
       let mintPubkey = null;
       if (mintAddress) {
         try {
           mintPubkey = new PublicKey(mintAddress);
-          console.log('Mint pubkey:', mintPubkey.toString());
         } catch (error) {
-          console.warn('Invalid mint address provided, using null instead:', mintAddress);
-          console.error('Mint address error:', error);
+          // Invalid mint address provided, using null instead
           mintPubkey = null;
         }
       } else {
-        console.log('No mint address provided');
+        // No mint address provided
       }
       
       const tx = await program.methods
@@ -255,7 +245,7 @@ class SolanaService {
         })
         .rpc();
 
-      console.log('Transfer transaction successful:', tx);
+      // Transfer transaction successful
 
       return {
         signature: tx,
@@ -355,6 +345,10 @@ class SolanaService {
     if (days > 0) return `${days}d ${hours}h`;
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
+  }
+
+  getConnection(): Connection {
+    return this.connection;
   }
 
   getConnectionStatus(): boolean {

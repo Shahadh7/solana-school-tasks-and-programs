@@ -58,7 +58,6 @@ export function createOptimizedConnection(): Connection {
 export function getWebSocketEndpoint(): string {
   const dedicatedWsUrl = process.env.NEXT_PUBLIC_HELIUS_WEBSOCKET_URL;
   if (dedicatedWsUrl) {
-    console.log('🔌 Using dedicated Helius WebSocket URL:', dedicatedWsUrl);
     return dedicatedWsUrl;
   }
   
@@ -66,7 +65,6 @@ export function getWebSocketEndpoint(): string {
   
   if (isUsingHelius()) {
     const wsEndpoint = httpEndpoint.replace('https://', 'wss://');
-    console.log('🔌 Using converted Helius WebSocket URL:', wsEndpoint);
     return wsEndpoint;
   }
   

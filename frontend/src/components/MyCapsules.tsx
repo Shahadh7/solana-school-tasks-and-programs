@@ -8,7 +8,7 @@ import { Clock, Calendar, Lock, Unlock, Share2, Eye, Loader2, ArrowRightLeft, Ex
 import toast, { Toaster } from 'react-hot-toast';
 import bs58 from 'bs58';
 import { useAppStore, Capsule } from '@/stores/appStore';
-import { formatDate, formatDatetime } from '@/lib/utils';
+import { formatDate, formatDatetime, getSolscanUrl, getSolanaExplorerUrl } from '@/lib/utils';
 import { solanaService } from '@/services/solana';
 import { encryptionService } from '@/services/encryption';
 import { nftService, CNFTMintOptions } from '@/services/nft';
@@ -18,6 +18,81 @@ import { PublicKey } from '@solana/web3.js';
 import { CapsuleUpdateModal } from '@/components/CapsuleUpdateModal';
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import { heliusDasService } from '@/services/helius-das';
+
+// Component to display transaction signature with lookup capability
+function TransactionDisplay({ capsule }: { capsule: Capsule }) {
+  const [signature, setSignature] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // If we already have a transaction signature, use it
+    if (capsule.metadata?.mintSignature || capsule.metadata?.transactionId) {
+      setSignature(capsule.metadata.mintSignature || capsule.metadata.transactionId || null);
+      return;
+    }
+
+    // For existing capsules without transaction data, try to find their creation transaction
+    const lookupTransaction = async () => {
+      if (!capsule.id) return;
+      
+      setLoading(true);
+      try {
+        // Try to get transaction signatures for this capsule account
+        const connection = solanaService.getConnection();
+        const capsulePublicKey = new PublicKey(capsule.id);
+        
+        // Get signatures for this account
+        const signatures = await connection.getSignaturesForAddress(capsulePublicKey, { limit: 10 });
+        
+        if (signatures.length > 0) {
+          // Use the oldest signature (creation transaction)
+          const creationSignature = signatures[signatures.length - 1].signature;
+          setSignature(creationSignature);
+        }
+      } catch (error) {
+        console.error('Error looking up transaction signature:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    lookupTransaction();
+  }, [capsule.id, capsule.metadata?.mintSignature, capsule.metadata?.transactionId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+        <span className="text-sm text-gray-400">Looking up transaction...</span>
+      </div>
+    );
+  }
+
+  if (!signature) {
+    return (
+      <div className="text-sm text-gray-400">
+        No transaction signature available
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="font-mono text-sm font-bold text-white truncate">
+        {signature.slice(0, 8)}...{signature.slice(-8)}
+      </div>
+      <a
+        href={getSolanaExplorerUrl('tx', signature)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-cyan-400 hover:text-cyan-300 transition-colors duration-200 flex items-center gap-1"
+        title="View on Solana Explorer"
+      >
+        <ExternalLink className="h-4 w-4" />
+      </a>
+    </div>
+  );
+}
 
 export function MyCapsules() {
   const { connected, publicKey, signTransaction, signMessage } = useWallet();
@@ -86,17 +161,7 @@ export function MyCapsules() {
       (capsule.metadata?.nftMinted && (capsule.mint || capsule.metadata?.assetId || capsule.metadata?.mintSignature)) 
     );
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🔍 hasMintedNFT check for ${capsule.name}:`, {
-        result,
-        mint: capsule.mint,
-        mintCreator: capsule.metadata?.mintCreator,
-        assetId: capsule.metadata?.assetId,
-        transferredAt: capsule.metadata?.transferredAt,
-        mintSignature: capsule.metadata?.mintSignature,
-        nftMinted: capsule.metadata?.nftMinted
-      });
-    }
+    // Development logging removed for production
     
     return result;
   };
@@ -125,7 +190,7 @@ export function MyCapsules() {
             };
           }
         } catch (error) {
-          console.log('Could not get signatures for matched cNFT:', error);
+          // Silently handle signature retrieval errors
         }
       }
       
@@ -170,14 +235,7 @@ export function MyCapsules() {
         const isTransferred = solanaCapsule.transferredAt && 
           (solanaCapsule.owner as any)?.toString() !== (solanaCapsule.creator as any)?.toString();
         
-        if (isTransferred) {
-          console.log('Processing transferred capsule:', {
-            title: solanaCapsule.title,
-            creator: (solanaCapsule.creator as any)?.toString(),
-            owner: (solanaCapsule.owner as any)?.toString(),
-            transferredAt: (solanaCapsule.transferredAt as any)?.toNumber()
-          });
-        }
+        // Processing transferred capsule silently
         
         
         if (solanaCapsule.isUnlocked && contentData.encryptedImageUrl) {
@@ -206,7 +264,6 @@ export function MyCapsules() {
                 
                 if (ipfsHash) {
                   imageUrl = encryptionService.constructDirectPinataUrl(ipfsHash);
-                  console.log('Using direct PINATA URL for transferred capsule:', imageUrl);
                 } else {
                   
                   try {
@@ -222,13 +279,13 @@ export function MyCapsules() {
                     );
                     imageUrl = decryptedImageUrl.decryptedUrl;
                   } catch {
-                    console.log('All decryption methods failed for transferred capsule');
+                    // All decryption methods failed for transferred capsule
                     imageUrl = '';
                   }
                 }
               }
             } catch (error) {
-              console.log('Error handling transferred capsule decryption:', error);
+              // Error handling transferred capsule decryption silently
               imageUrl = '';
             }
           } else {
@@ -266,10 +323,46 @@ export function MyCapsules() {
             }
           }
         } else if (!solanaCapsule.isUnlocked && contentData.encryptedImageUrl) {
-          
+          // Check if capsule should be unlocked based on time
           const currentTime = Math.floor(Date.now() / 1000);
           if ((solanaCapsule.unlockDate as any).toNumber() <= currentTime) {
-            
+            // Try to decrypt image for time-unlocked capsule
+            try {
+              const decryptedImageUrl = await encryptionService.decryptPinataUrl(
+                {
+                  encryptedUrl: contentData.encryptedImageUrl,
+                  iv: contentData.encryptedImageIv
+                },
+                publicKey!,
+                solanaCapsule.title as string,
+                (solanaCapsule.unlockDate as any).toNumber(),
+                publicKey!.toString()
+              );
+              imageUrl = decryptedImageUrl.decryptedUrl;
+            } catch {
+              // Try with trimmed title as fallback
+              try {
+                const decryptedImageUrl = await encryptionService.decryptPinataUrl(
+                  {
+                    encryptedUrl: contentData.encryptedImageUrl,
+                    iv: contentData.encryptedImageIv
+                  },
+                  publicKey!,
+                  (solanaCapsule.title as string).trim(),
+                  (solanaCapsule.unlockDate as any).toNumber(),
+                  publicKey!.toString()
+                );
+                imageUrl = decryptedImageUrl.decryptedUrl;
+              } catch {
+                imageUrl = '';
+              }
+            }
+          }
+        } else if (solanaCapsule.isUnlocked && !contentData.encryptedImageUrl) {
+          // Handle case where capsule is unlocked but no encrypted image URL exists
+          // This might be an older capsule or one with different data structure
+          if (contentData.imageUrl) {
+            imageUrl = contentData.imageUrl;
           }
         }
 
@@ -380,14 +473,7 @@ export function MyCapsules() {
           finalNftMinted = true;
         }
         
-        console.log(`🔍 NFT Status Check for ${updatedCapsule.name}:`, {
-          nftMinted: finalNftMinted,
-          originalCheck: nftMinted,
-          mint: updatedCapsule.mint,
-          assetId: updatedCapsule.metadata?.assetId,
-          mintSignature: updatedCapsule.metadata?.mintSignature,
-          mintCreator: updatedCapsule.metadata?.mintCreator
-        });
+        // NFT Status Check completed silently
         
         return {
           ...updatedCapsule,
@@ -490,20 +576,11 @@ export function MyCapsules() {
       };
       
       
-      console.log('🎯 Updating capsule state immediately after mint:', {
-        capsuleId: capsule.id,
-        nftMinted: updatedCapsuleData.metadata.nftMinted,
-        mintSignature: updatedCapsuleData.metadata.mintSignature,
-        assetId: updatedCapsuleData.metadata.assetId,
-        hasMintedNFTBefore: hasMintedNFT(capsule),
-        hasMintedNFTAfter: hasMintedNFT(updatedCapsuleData)
-      });
+      // Capsule state updated after mint
       updateCapsule(capsule.id, updatedCapsuleData);
       
       
-      setTimeout(() => {
-        console.log('🔄 Forcing UI refresh after state update');
-      }, 100);
+      // UI refresh scheduled after state update
 
       
       if (mintAsCompressed) {
@@ -663,12 +740,7 @@ export function MyCapsules() {
     try {
       toast.loading('Transferring capsule...', { id: 'transfer' });
 
-      console.log('Starting capsule transfer:', {
-        capsuleId: capsule.id,
-        fromAddress: publicKey.toString(),
-        toAddress: cleanAddress,
-        transferType: transferCNFT ? 'capsule-and-cnft' : 'capsule-only'
-      });
+      // Starting capsule transfer
 
       
       const transferResult = await solanaService.transferCapsule(
@@ -695,7 +767,7 @@ export function MyCapsules() {
             newOwner: cleanAddress, 
           });
 
-          console.log('CNFT transfer successful:', cnftTransferSignature);
+          // CNFT transfer successful
           toast.success('🎉 CNFT transferred successfully!', { id: 'cnft-transfer' });
         } catch (cnftError) {
           console.error('CNFT transfer failed:', cnftError);
@@ -751,11 +823,7 @@ export function MyCapsules() {
     try {
       toast.loading('Transferring CNFT...', { id: 'cnft-transfer' });
 
-      console.log('Starting CNFT-only transfer:', {
-        capsuleId: capsule.id,
-        fromAddress: publicKey.toString(),
-        toAddress: cleanAddress,
-      });
+      // Starting CNFT-only transfer
 
       
       await cnftService.initialize({
@@ -770,7 +838,7 @@ export function MyCapsules() {
         newOwner: cleanAddress, 
       });
 
-      console.log('CNFT transfer successful:', cnftTransferSignature);
+      // CNFT transfer successful
       toast.success('🎉 CNFT transferred successfully!', { id: 'cnft-transfer' });
 
       
@@ -793,25 +861,47 @@ export function MyCapsules() {
 
     setUnlockingCapsule(capsule.id);
     try {
-      if (capsule.isLocked) {
-        
-        await solanaService.unlockCapsule(
-          createWalletWrapper()!,
-          capsule.id
-        );
-      }
-
-      
       
       const walletWrapper = createWalletWrapper();
       if (!walletWrapper) return;
       
-      const solanaCapsules = await solanaService.getWalletCapsules(walletWrapper);
       
+      const solanaCapsules = await solanaService.getWalletCapsules(walletWrapper);
       const currentCapsule = solanaCapsules.find((c: Record<string, unknown>) => c.address as string === capsule.id);
+      
       if (!currentCapsule) {
         throw new Error('Capsule not found');
       }
+      
+      
+      if (currentCapsule.isUnlocked) {
+        
+        if (!capsule.isLocked) {
+          toast.success('Capsule is already unlocked!');
+        } else {
+          
+          updateCapsule(capsule.id, { isLocked: false });
+          toast.success('Capsule was already unlocked on-chain!');
+        }
+        await loadUserCapsules();
+        return;
+      }
+      
+      
+      if (capsule.isLocked) {
+        await solanaService.unlockCapsule(walletWrapper, capsule.id);
+        
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const updatedCapsules = await solanaService.getWalletCapsules(walletWrapper);
+        const updatedCapsule = updatedCapsules.find((c: Record<string, unknown>) => c.address as string === capsule.id);
+        
+        if (!updatedCapsule || !updatedCapsule.isUnlocked) {
+          throw new Error('Capsule unlock transaction failed or not confirmed');
+        }
+      }
+      
       
       let contentData;
       try {
@@ -820,7 +910,6 @@ export function MyCapsules() {
         throw new Error('Failed to parse capsule content');
       }
       
-
       
       const decryptedImageUrl = await encryptionService.decryptPinataUrl(
         {
@@ -833,8 +922,6 @@ export function MyCapsules() {
         publicKey.toString() 
       );
 
-
-
       
       updateCapsule(capsule.id, {
         isLocked: false,
@@ -843,9 +930,29 @@ export function MyCapsules() {
 
       
       await loadUserCapsules();
+      toast.success('Capsule unlocked successfully!');
+      
+      
+      setTimeout(() => {
+        loadUserCapsules();
+      }, 2000);
 
-    } catch {
-      toast.error('Failed to unlock capsule. Please try again.');
+    } catch (error) {
+      console.error('Unlock error:', error);
+      
+      if (error instanceof Error && error.message.includes('Capsule not found')) {
+        toast.error('Capsule not found. Please refresh and try again.');
+      } else if (error instanceof Error && error.message.includes('Failed to parse capsule content')) {
+        toast.error('Failed to parse capsule content. Please refresh and try again.');
+      } else if (error instanceof Error && error.message.includes('User rejected')) {
+        toast.error('Transaction was cancelled by user.');
+      } else if (error instanceof Error && error.message.includes('insufficient funds')) {
+        toast.error('Insufficient SOL balance for transaction fees.');
+      } else if (error instanceof Error && error.message.includes('Capsule unlock transaction failed')) {
+        toast.error('Capsule unlock transaction failed. Please try again.');
+      } else {
+        toast.error('Failed to unlock capsule. Please try again.');
+      }
     } finally {
       setUnlockingCapsule(null);
     }
@@ -921,7 +1028,6 @@ export function MyCapsules() {
         </p>
         <Button
           onClick={() => {
-            console.log('🔄 Manual refresh triggered by user');
             loadUserCapsules();
           }}
           disabled={loading}
@@ -1103,21 +1209,7 @@ export function MyCapsules() {
                   </Button>
                 )}
                 
-                {!capsule.isLocked && !capsule.imageUrl && isUnlocked(capsule.unlockDate) && (
-                  <Button
-                    size="sm"
-                    onClick={() => handleUnlockCapsule(capsule)}
-                    disabled={unlockingCapsule === capsule.id}
-                    className="flex-1 min-w-[120px] bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 px-4 py-2.5 rounded-xl"
-                  >
-                    {unlockingCapsule === capsule.id ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Unlock className="h-4 w-4 mr-2" />
-                    )}
-                    <span className="font-semibold">Re-unlock</span>
-                  </Button>
-                )}
+
 
                 {!capsule.isLocked && (
                   <>
@@ -1344,6 +1436,17 @@ export function MyCapsules() {
                       <div className="font-mono text-base font-bold text-white">
                         {selectedCapsule.mint.slice(0, 8)}...{selectedCapsule.mint.slice(-8)}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Show transaction section for capsules that have transaction data OR for existing capsules by looking up their creation */}
+                  {(selectedCapsule.metadata?.mintSignature || selectedCapsule.metadata?.transactionId || selectedCapsule.id) && (
+                    <div className="bg-white/5 rounded-xl p-6 border border-amber-400/20">
+                      <div className="flex items-center gap-3 text-base text-gray-300 mb-3">
+                        <div className="w-3 h-3 bg-cyan-400 rounded-full"></div>
+                        Transaction
+                      </div>
+                      <TransactionDisplay capsule={selectedCapsule} />
                     </div>
                   )}
                 </div>
@@ -1727,7 +1830,7 @@ export function MyCapsules() {
                               <div className="text-sm text-gray-600 dark:text-gray-400">
                                 <span className="font-medium">Transaction Signature:</span>{' '}
                                 <a
-                                  href={`https://solscan.io/tx/${capsule.metadata.mintSignature}`}
+                                  href={getSolscanUrl('tx', capsule.metadata.mintSignature)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 break-all"
@@ -1739,7 +1842,7 @@ export function MyCapsules() {
                               <div className="text-sm text-gray-600 dark:text-gray-400">
                                 <span className="font-medium">Transaction ID:</span>{' '}
                                 <a
-                                  href={`https://solscan.io/tx/${capsule.metadata.transactionId}`}
+                                  href={getSolscanUrl('tx', capsule.metadata.transactionId)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 break-all"
@@ -1818,7 +1921,7 @@ export function MyCapsules() {
                           const treeAddress = capsule.metadata?.treeAddress || 
                                             process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS;
                           if (treeAddress) {
-                            window.open(`https://solscan.io/tree/${treeAddress}`)
+                            window.open(getSolscanUrl('account', treeAddress))
                           } else {
                             toast.error('No tree address available to view');
                           }
@@ -1834,7 +1937,7 @@ export function MyCapsules() {
                           const treeAddress = capsule.metadata?.treeAddress || 
                                             process.env.NEXT_PUBLIC_MERKLE_TREE_ADDRESS;
                           if (treeAddress) {
-                            window.open(`https://explorer.solana.com/address/${treeAddress}`)
+                            window.open(getSolanaExplorerUrl('address', treeAddress))
                           } else {
                             toast.error('No tree address available to view');
                           }

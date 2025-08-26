@@ -259,7 +259,7 @@ class NFTService {
           }
         })
 
-      console.log(`Found ${capsules.length} cNFTs for wallet ${walletAddress.toString()}`)
+      // Found cNFTs for wallet silently
       return capsules
     } catch (error) {
       console.error('Error fetching wallet cNFTs:', error)
@@ -278,7 +278,7 @@ class NFTService {
     }
   ): Promise<string> {
     try {
-      console.log('Transfer requested for:', params.assetId, 'to:', params.newOwner.toString(), 'from:', wallet.publicKey.toString())
+      // Transfer requested silently
   
       throw new Error('Transfer functionality will be implemented in the next iteration')
     } catch (error) {

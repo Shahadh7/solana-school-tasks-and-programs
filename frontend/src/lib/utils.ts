@@ -1,8 +1,60 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { getNetwork } from "./rpc-config"
+import { WalletAdapterNetwork } from "@solana/wallet-adapter-base"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+/**
+ * Generate Solscan URL with proper cluster parameter based on current network configuration
+ */
+export function getSolscanUrl(type: 'tx' | 'account' | 'token', identifier: string): string {
+  const network = getNetwork()
+  
+  let cluster = ''
+  switch (network) {
+    case WalletAdapterNetwork.Devnet:
+      cluster = '?cluster=devnet'
+      break
+    case WalletAdapterNetwork.Testnet:
+      cluster = '?cluster=testnet'
+      break
+    case WalletAdapterNetwork.Mainnet:
+      // Mainnet doesn't need cluster parameter
+      cluster = ''
+      break
+    default:
+      cluster = '?cluster=devnet'
+  }
+  
+  return `https://solscan.io/${type}/${identifier}${cluster}`
+}
+
+/**
+ * Generate Solana Explorer URL with proper cluster parameter based on current network configuration
+ */
+export function getSolanaExplorerUrl(type: 'tx' | 'address' | 'block', identifier: string): string {
+  const network = getNetwork()
+  
+  let cluster = ''
+  switch (network) {
+    case WalletAdapterNetwork.Devnet:
+      cluster = '?cluster=devnet'
+      break
+    case WalletAdapterNetwork.Testnet:
+      cluster = '?cluster=testnet'
+      break
+    case WalletAdapterNetwork.Mainnet:
+      // Mainnet doesn't need cluster parameter
+      cluster = ''
+      break
+    default:
+      cluster = '?cluster=devnet'
+  }
+  
+  return `https://explorer.solana.com/${type}/${identifier}${cluster}`
 }
 
 export function formatAddress(address: string, chars = 4): string {
