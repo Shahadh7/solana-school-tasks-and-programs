@@ -77,13 +77,28 @@ export function MyCapsules() {
   const hasMintedNFT = (capsule: Capsule): boolean => {
     // Check multiple indicators for NFT status
     // A capsule is only truly minted if it has actual NFT data
-    return !!(
+    const result = !!(
       capsule.mint || 
       capsule.metadata?.mintCreator || 
       capsule.metadata?.assetId ||
       capsule.metadata?.transferredAt ||
-      (capsule.metadata?.nftMinted && (capsule.mint || capsule.metadata?.assetId)) // Only if we have actual NFT data
+      capsule.metadata?.mintSignature ||
+      (capsule.metadata?.nftMinted && (capsule.mint || capsule.metadata?.assetId || capsule.metadata?.mintSignature)) // Only if we have actual NFT data
     );
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔍 hasMintedNFT check for ${capsule.name}:`, {
+        result,
+        mint: capsule.mint,
+        mintCreator: capsule.metadata?.mintCreator,
+        assetId: capsule.metadata?.assetId,
+        transferredAt: capsule.metadata?.transferredAt,
+        mintSignature: capsule.metadata?.mintSignature,
+        nftMinted: capsule.metadata?.nftMinted
+      });
+    }
+    
+    return result;
   };
 
   // Function to search for existing cNFTs that match this capsule
@@ -285,52 +300,66 @@ export function MyCapsules() {
 
       // Check NFT minting status from on-chain data instead of localStorage
       const capsulesWithNFTStatus = await Promise.all(transformedCapsules.map(async (capsule) => {
-        // Use the helper function to check multiple indicators for NFT status
-        const nftMinted = hasMintedNFT(capsule);
-        
-        // If NFT is minted but we don't have a transaction signature, try to fetch it from Helius
+        // Start with what we have from the blockchain
         let transactionSignature = capsule.mint || capsule.metadata?.mintCreator || undefined;
+        let updatedCapsule = { ...capsule };
         
-        if (nftMinted && !transactionSignature && capsule.metadata?.assetId) {
+        // First, try to populate missing NFT metadata if we have a mint address
+        if (updatedCapsule.mint && !updatedCapsule.metadata?.assetId) {
           try {
-            // Try to get transaction signatures from Helius DAS API
-            const signatures = await heliusDasService.getSignaturesForAsset(capsule.metadata.assetId);
-            
+            // Try to get asset info from Helius using the mint address
+            const assetInfo = await heliusDasService.getAsset(updatedCapsule.mint);
+            if (assetInfo) {
+              // Update the capsule with the found asset ID
+              updatedCapsule.metadata = {
+                ...updatedCapsule.metadata,
+                assetId: assetInfo.id
+              };
+              
+              // Try to get signatures using the asset ID
+              try {
+                const signatures = await heliusDasService.getSignaturesForAsset(assetInfo.id);
+                if (signatures.items && signatures.items.length > 0) {
+                  transactionSignature = signatures.items[0][0];
+                  updatedCapsule.metadata = {
+                    ...updatedCapsule.metadata,
+                    mintSignature: transactionSignature
+                  };
+                }
+              } catch (sigError) {
+                console.error('Error fetching signatures for asset:', sigError);
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching asset info from Helius:', error);
+          }
+        }
+        
+        // If we have assetId but no signature, try to get signatures
+        if (updatedCapsule.metadata?.assetId && !transactionSignature) {
+          try {
+            const signatures = await heliusDasService.getSignaturesForAsset(updatedCapsule.metadata.assetId);
             if (signatures.items && signatures.items.length > 0) {
-              // Get the first signature (usually the mint transaction)
               transactionSignature = signatures.items[0][0];
+              updatedCapsule.metadata = {
+                ...updatedCapsule.metadata,
+                mintSignature: transactionSignature
+              };
             }
           } catch (error) {
             console.error('Error fetching transaction signature from Helius:', error);
           }
-        } else if (nftMinted && !transactionSignature && !capsule.metadata?.assetId) {
-          // If we don't have an assetId, try to get it from the mint address
-          try {
-            if (capsule.mint) {
-              // Try to get asset info from Helius using the mint address
-              const assetInfo = await heliusDasService.getAsset(capsule.mint);
-              if (assetInfo) {
-                // Now try to get signatures using the asset ID
-                const signatures = await heliusDasService.getSignaturesForAsset(assetInfo.id);
-                if (signatures.items && signatures.items.length > 0) {
-                  transactionSignature = signatures.items[0][0];
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Error fetching asset info or signatures:', error);
-          }
         }
         
-        // If still no transaction signature, try to search for existing cNFTs that match this capsule
-        if (nftMinted && !transactionSignature && !capsule.metadata?.assetId) {
+        // If we still don't have NFT data, try to search for existing cNFTs that match this capsule
+        if (!updatedCapsule.metadata?.assetId && !transactionSignature) {
           try {
-            const existingCNFT = await searchForExistingCNFT(capsule);
+            const existingCNFT = await searchForExistingCNFT(updatedCapsule);
             if (existingCNFT) {
               // Update the capsule with the found cNFT data
               transactionSignature = existingCNFT.mintSignature;
-              capsule.metadata = {
-                ...capsule.metadata,
+              updatedCapsule.metadata = {
+                ...updatedCapsule.metadata,
                 assetId: existingCNFT.assetId,
                 mintSignature: existingCNFT.mintSignature
               };
@@ -340,14 +369,34 @@ export function MyCapsules() {
           }
         }
         
+        // NOW determine NFT minting status after we've populated all available metadata
+        const nftMinted = hasMintedNFT(updatedCapsule);
+        
+        // Additional check: If we have a mint address but nftMinted is false, 
+        // it might be an edge case where the mint exists but metadata isn't populated
+        let finalNftMinted = nftMinted;
+        if (!nftMinted && updatedCapsule.mint) {
+          console.warn(`⚠️ Capsule ${updatedCapsule.name} has mint address but nftMinted is false. Treating as minted.`);
+          finalNftMinted = true;
+        }
+        
+        console.log(`🔍 NFT Status Check for ${updatedCapsule.name}:`, {
+          nftMinted: finalNftMinted,
+          originalCheck: nftMinted,
+          mint: updatedCapsule.mint,
+          assetId: updatedCapsule.metadata?.assetId,
+          mintSignature: updatedCapsule.metadata?.mintSignature,
+          mintCreator: updatedCapsule.metadata?.mintCreator
+        });
+        
         return {
-          ...capsule,
+          ...updatedCapsule,
           metadata: {
-            ...capsule.metadata,
-            nftMinted,
+            ...updatedCapsule.metadata,
+            nftMinted: finalNftMinted,
             mintSignature: transactionSignature,
             // Use mint address as transaction identifier for existing NFTs
-            transactionId: capsule.mint || capsule.metadata?.mintCreator || undefined
+            transactionId: updatedCapsule.mint || updatedCapsule.metadata?.mintCreator || undefined
           }
         };
       }));
@@ -424,6 +473,38 @@ export function MyCapsules() {
         mintOptions
       );
 
+      // Immediately update the UI to show NFT as minted (optimistic update)
+      const updatedCapsuleData = {
+        ...capsule,
+        mint: mintResult.signature, // Use signature as the mint identifier
+        metadata: {
+          ...capsule.metadata,
+          nftMinted: true,
+          mintSignature: mintResult.signature,
+          // Store cNFT metadata for future reference
+          assetId: mintResult.assetId || undefined,
+          // Store capsule identifier to match with cNFT
+          capsuleId: capsule.id,
+          capsuleName: capsule.name
+        }
+      };
+      
+      // Update the state immediately to hide the mint button
+      console.log('🎯 Updating capsule state immediately after mint:', {
+        capsuleId: capsule.id,
+        nftMinted: updatedCapsuleData.metadata.nftMinted,
+        mintSignature: updatedCapsuleData.metadata.mintSignature,
+        assetId: updatedCapsuleData.metadata.assetId,
+        hasMintedNFTBefore: hasMintedNFT(capsule),
+        hasMintedNFTAfter: hasMintedNFT(updatedCapsuleData)
+      });
+      updateCapsule(capsule.id, updatedCapsuleData);
+      
+      // Force a UI update by triggering a state change
+      setTimeout(() => {
+        console.log('🔄 Forcing UI refresh after state update');
+      }, 100);
+
       // Set up real-time transaction monitoring with toast notifications
       if (mintAsCompressed) {
         toast.promise(
@@ -433,30 +514,35 @@ export function MyCapsules() {
               setMintStatus('✅ cNFT minted successfully!');
               setMintProgress(100);
               
-              // Update capsule with NFT info
-              const updatedCapsule = {
-                ...capsule,
-                mint: mintResult.signature, // Use signature as the mint identifier
+              // Ensure the capsule data is updated with confirmed status
+              const confirmedCapsule = {
+                ...updatedCapsuleData,
                 metadata: {
-                  ...capsule.metadata,
-                  nftMinted: true,
-                  mintSignature: mintResult.signature,
-                  // Store cNFT metadata for future reference
-                  assetId: mintResult.assetId || undefined,
-                  // Store capsule identifier to match with cNFT
-                  capsuleId: capsule.id,
-                  capsuleName: capsule.name
+                  ...updatedCapsuleData.metadata,
+                  nftMinted: true, // Ensure this is explicitly set
+                  confirmed: true, // Add confirmation flag
                 }
               };
               
-              updateCapsule(capsule.id, updatedCapsule);
+              updateCapsule(capsule.id, confirmedCapsule);
               
               // Force reload capsules to ensure UI updates and get fresh on-chain data
               setTimeout(() => {
                 loadUserCapsules();
-              }, 1000);
+              }, 2000); // Increased delay to ensure transaction is fully confirmed
             } else if (status.status === 'failed') {
               setMintStatus(`❌ Minting failed: ${status.error}`);
+              
+              // Revert the optimistic update on failure
+              const revertedCapsule = {
+                ...capsule,
+                metadata: {
+                  ...capsule.metadata,
+                  nftMinted: false, // Revert the minted status
+                }
+              };
+              updateCapsule(capsule.id, revertedCapsule);
+              
               throw new Error(status.error || 'Minting failed');
             } else if (status.status === 'pending') {
               setMintStatus('⏳ Transaction pending confirmation...');
@@ -472,43 +558,29 @@ export function MyCapsules() {
         setMintStatus('✅ NFT minted successfully!');
         setMintProgress(100);
         toast.success('🎉 NFT minted successfully!');
-      }
-
-
-
-      // Immediately update the UI to show NFT as minted (optimistic update)
-      if (mintResult.signature) {
-        const updatedCapsuleData = {
-          ...capsule,
-          mint: mintResult.signature, // Use signature as the mint identifier
-          metadata: {
-            ...capsule.metadata,
-            nftMinted: true,
-            mintSignature: mintResult.signature,
-            // Store cNFT metadata for future reference
-            assetId: mintResult.assetId || undefined,
-            // Store capsule identifier to match with cNFT
-            capsuleId: capsule.id,
-            capsuleName: capsule.name
-          }
-        };
         
-        updateCapsule(capsule.id, updatedCapsuleData);
-        
-        // Force reload capsules to ensure UI updates and get fresh on-chain data
+        // For regular NFTs, reload after a short delay
         setTimeout(() => {
           loadUserCapsules();
-        }, 1000);
-        
-
+        }, 1500);
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Revert the optimistic update on error
+      const revertedCapsule = {
+        ...capsule,
+        metadata: {
+          ...capsule.metadata,
+          nftMinted: false,
+        }
+      };
+      updateCapsule(capsule.id, revertedCapsule);
+      
       toast.error(`Failed to mint NFT: ${errorMessage}`);
       setMintStatus(`❌ Error: ${errorMessage}`);
       setMintProgress(0);
-      toast.error(`❌ Minting failed: ${errorMessage}`);
     } finally {
       setTimeout(() => {
         setMintingCapsule(null);
@@ -848,7 +920,10 @@ export function MyCapsules() {
           Manage and unlock your time-locked memories
         </p>
         <Button
-          onClick={loadUserCapsules}
+          onClick={() => {
+            console.log('🔄 Manual refresh triggered by user');
+            loadUserCapsules();
+          }}
           disabled={loading}
           variant="outline"
           size="sm"
@@ -888,7 +963,7 @@ export function MyCapsules() {
             </div>
 
             {/* NFT Badge */}
-            {capsule.metadata?.nftMinted && (
+            {hasMintedNFT(capsule) && (
               <div className="absolute top-4 left-4 z-10">
                 <div className="flex items-center gap-1 bg-gradient-to-r from-purple-500 to-violet-600 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg">
                   <Lock className="h-3 w-3" />
@@ -1056,7 +1131,7 @@ export function MyCapsules() {
                 {!capsule.isLocked && (
                   <>
                     {/* Show Mint NFT button only if NFT is not minted */}
-                    {!capsule.metadata?.nftMinted && (
+                    {!hasMintedNFT(capsule) && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1111,7 +1186,7 @@ export function MyCapsules() {
                     )}
 
                     {/* View NFT button for minted NFTs */}
-                    {capsule.metadata?.nftMinted && (
+                    {hasMintedNFT(capsule) && (
                       <Button
                         variant="outline"
                         size="sm"
