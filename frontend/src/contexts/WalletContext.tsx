@@ -10,7 +10,7 @@ import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
 import {
   WalletModalProvider,
 } from '@solana/wallet-adapter-react-ui';
-import { getRPCEndpoint, getNetwork, isUsingHelius } from '@/lib/rpc-config';
+import { getRPCEndpoint, getNetwork } from '@/lib/rpc-config';
 
 
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -27,6 +27,7 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
   
   
   const network = useMemo(() => getNetwork(), []);
+  void network; // keep computed for potential UI toggles; suppress unused var warning
 
 
 

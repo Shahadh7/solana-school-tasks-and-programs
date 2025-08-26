@@ -1,4 +1,4 @@
-import { Connection, PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { Connection, PublicKey } from '@solana/web3.js';
 import { ipfsService } from './ipfs';
 import { createOptimizedConnection } from '@/lib/rpc-config';
 import { heliusWebSocket } from './helius-websocket';
@@ -25,9 +25,10 @@ export interface CapsuleMetadata {
   }
 }
 
-export interface Wallet {
+export type Wallet = {
   publicKey: PublicKey
-  signTransaction: <T extends Transaction | VersionedTransaction>(transaction: T) => Promise<T>
+  // Use a generic signature compatible with CNFT wallet interface to avoid type mismatch
+  signTransaction: <T>(transaction: T) => Promise<T>
   signMessage: (message: Uint8Array) => Promise<Uint8Array>
 }
 
@@ -255,7 +256,10 @@ class NFTService {
               trait_type: attr.trait_type || 'Unknown',
               value: attr.value?.toString() || ''
             })) || [],
-            properties: metadata.properties
+            properties: metadata.properties ? {
+              files: metadata.properties.files || [],
+              category: metadata.properties.category || 'image'
+            } : undefined
           }
         })
 
@@ -271,20 +275,14 @@ class NFTService {
    * Transfer a memory capsule to another wallet
    */
   async transferCapsule(
-    wallet: Wallet,
-    params: {
+    _wallet: Wallet,
+    _params: {
       assetId: string
       newOwner: PublicKey
     }
   ): Promise<string> {
-    try {
-      // Transfer requested silently
-  
-      throw new Error('Transfer functionality will be implemented in the next iteration')
-    } catch (error) {
-      console.error('Error transferring capsule:', error)
-      throw error
-    }
+    // Not used in current flow; implemented via combined-transfer service
+    throw new Error('Use combined-transfer service for capsule + cNFT transfer')
   }
 
   /**

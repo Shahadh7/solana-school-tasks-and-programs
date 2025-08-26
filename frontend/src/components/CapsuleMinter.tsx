@@ -6,7 +6,7 @@ import { useDropzone } from 'react-dropzone';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Upload, Calendar, Loader2, CheckCircle, AlertCircle, Lock } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { useAppStore } from '@/stores/appStore';
 
 import { WebSocketStatus } from '@/components/WebSocketStatus';
@@ -227,6 +227,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
       );
 
       setMintingState({ status: 'success', progress: 100 });
+      void mintResult; // prevent unused var warning while preserving future-use semantics
 
       // NFT minted successfully
 
@@ -400,6 +401,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
             <input {...getInputProps()} />
             {previewUrl ? (
               <div className="space-y-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={previewUrl} alt="Preview" className="mx-auto max-h-32 rounded" />
                 <p className="text-sm text-gray-600">Click to change image</p>
               </div>

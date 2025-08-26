@@ -4,6 +4,7 @@ import "./globals.css";
 import { WalletContextProvider } from "@/contexts/WalletContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Navigation } from "@/components/Navigation";
+import Image from "next/image";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,10 +52,13 @@ export default function RootLayout({
                 <div className="container mx-auto px-6 text-center">
                   <div className="flex items-center justify-center space-x-2 mb-4">
                     <div className="w-6 h-6 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-lg flex items-center justify-center p-0.5">
-                      <img 
+                      <Image 
                         src="/logo.svg" 
                         alt="DearFuture Web3 Logo" 
+                        width={24}
+                        height={24}
                         className="w-full h-full object-contain"
+                        priority
                       />
                     </div>
                     <span className="text-sm font-semibold text-gray-300">DearFuture Web3</span>

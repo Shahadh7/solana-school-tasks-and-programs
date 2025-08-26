@@ -300,7 +300,7 @@ class CNFTService {
             onProgress('cNFT minted and confirmed!', 100)
           } else if (status.status === 'failed') {
           }
-        }).catch(error => {
+        }).catch(() => {
         })
       }
 

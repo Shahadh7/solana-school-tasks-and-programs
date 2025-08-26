@@ -5,7 +5,7 @@
  * in a single transaction flow. This ensures both transfers succeed or both fail.
  */
 
-import { PublicKey, Transaction, VersionedTransaction, TransactionInstruction } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { solanaService, TransferCapsuleResult, Wallet } from './solana';
 import { cnftService } from './cnft';
 
@@ -77,7 +77,9 @@ class CombinedTransferService {
         // Initialize cNFT service with compatible wallet format
         await cnftService.initialize({
           publicKey: wallet.publicKey,
-          signTransaction: wallet.signTransaction as any,
+          // Wallet type here matches CNFT Wallet signature accepting generic transaction types
+          // We cast to preserve type compatibility without using 'any' in code paths
+          signTransaction: wallet.signTransaction as unknown as <T>(transaction: T) => Promise<T>,
           signMessage: wallet.signMessage,
         });
         

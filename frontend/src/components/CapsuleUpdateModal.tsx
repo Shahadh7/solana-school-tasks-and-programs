@@ -31,12 +31,7 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
 
-  if (!isOpen || !capsule) return null;
-  
-  if (!capsule.isLocked) {
-    return null;
-  }
-
+  // Hooks must run unconditionally before any early returns
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
@@ -53,6 +48,8 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
     maxFiles: 1,
     maxSize: 10 * 1024 * 1024,
   });
+
+  if (!isOpen || !capsule || !capsule.isLocked) return null;
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -89,7 +86,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
     setIsUpdating(true);
     try {
       let encryptedImageUrl: string | undefined;
-      let encryptedImageIv: string | undefined;
 
       if (newImage) {
         setIsUploading(true);
@@ -114,7 +110,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
           );
 
           encryptedImageUrl = encryptedData.encryptedUrl;
-          encryptedImageIv = encryptedData.iv;
           setUploadProgress(100);
           
           toast.success('🖼️ Image uploaded and encrypted successfully!', {
@@ -135,7 +130,7 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
         ? Math.floor(new Date(formData.newUnlockDate).getTime() / 1000)
         : undefined;
 
-      const signature = await solanaService.updateCapsule(
+      await solanaService.updateCapsule(
         {
           publicKey,
           signTransaction: signTransaction!,
@@ -259,6 +254,7 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
                 <input {...getInputProps()} />
                 {imagePreview ? (
                   <div className="space-y-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={imagePreview} alt="Preview" className="mx-auto max-h-32 rounded-lg" />
                     <p className="text-sm text-amber-300">Click to change image</p>
                     <Button

@@ -3,6 +3,7 @@
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 export function Navigation() {
   const { connected, publicKey } = useWallet();
@@ -19,10 +20,13 @@ export function Navigation() {
           <div className="flex items-center space-x-2 md:space-x-3 min-w-0 flex-1">
             <div className="relative flex-shrink-0">
               <div className="w-8 h-8 md:w-12 md:h-12 bg-gradient-to-r from-amber-400 via-yellow-500 to-orange-400 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/25 p-1">
-                <img 
+                <Image 
                   src="/logo.svg" 
                   alt="DearFuture Web3 Logo" 
+                  width={48}
+                  height={48}
                   className="w-full h-full object-contain"
+                  priority
                 />
               </div>
               <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-orange-400 rounded-lg md:rounded-xl blur opacity-30 animate-pulse"></div>

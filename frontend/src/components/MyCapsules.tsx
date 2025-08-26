@@ -4,20 +4,22 @@ import { useEffect, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Calendar, Lock, Unlock, Share2, Eye, Loader2, ArrowRightLeft, ExternalLink, Maximize2, X, Edit3 } from 'lucide-react';
+import { Clock, Calendar, Lock, Unlock, Eye, Loader2, ArrowRightLeft, ExternalLink, Maximize2, Edit3 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-import bs58 from 'bs58';
+// bs58 helper removed; no direct usage
 import { useAppStore, Capsule } from '@/stores/appStore';
-import { formatDate, formatDatetime, getSolscanUrl, getSolanaExplorerUrl } from '@/lib/utils';
+import { formatDate, formatDatetime, getSolscanUrl, getSolanaExplorerUrl, getTimeUntil } from '@/lib/utils';
 import { solanaService } from '@/services/solana';
 import { encryptionService } from '@/services/encryption';
 import { nftService, CNFTMintOptions } from '@/services/nft';
 import { cnftService } from '@/services/cnft';
 import { combinedTransferService, CombinedTransferError } from '@/services/combined-transfer';
 import { MintTransactionStatus } from '@/services/helius-das';
+import { FullscreenImageOverlay } from '@/components/FullscreenImageOverlay';
+import { TransactionDisplay as TransactionDisplayComponent } from '@/components/TransactionDisplay';
 import { PublicKey } from '@solana/web3.js';
 import { CapsuleUpdateModal } from '@/components/CapsuleUpdateModal';
-import { Transaction, VersionedTransaction } from '@solana/web3.js';
+// Removed unused imports: Transaction, VersionedTransaction
 import { heliusDasService } from '@/services/helius-das';
 
 // Component to display transaction signature with lookup capability
@@ -78,20 +80,7 @@ function TransactionDisplay({ capsule }: { capsule: Capsule }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="font-mono text-sm font-bold text-white truncate">
-        {signature.slice(0, 8)}...{signature.slice(-8)}
-      </div>
-      <a
-        href={getSolanaExplorerUrl('tx', signature)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-cyan-400 hover:text-cyan-300 transition-colors duration-200 flex items-center gap-1"
-        title="View on Solana Explorer"
-      >
-        <ExternalLink className="h-4 w-4" />
-      </a>
-    </div>
+    <TransactionDisplayComponent capsuleId={capsule.id} defaultSignature={signature} />
   );
 }
 
@@ -115,28 +104,7 @@ export function MyCapsules() {
   const [showUpdateModal, setShowUpdateModal] = useState<string | null>(null);
 
   
-  const convertSignatureToBase58 = (signature: unknown): string => {
-    try {
-      if (typeof signature === 'string') {
-        
-        if (signature.includes(',')) {
-          
-          const bytes = signature.split(',').map(num => parseInt(num.trim(), 10));
-          return bs58.encode(new Uint8Array(bytes));
-        }
-        return signature; 
-      } else if (Array.isArray(signature)) {
-        
-        return bs58.encode(new Uint8Array(signature));
-      } else if (signature instanceof Uint8Array) {
-        
-        return bs58.encode(signature);
-      }
-      return String(signature);
-    } catch (error) {
-      return String(signature);
-    }
-  };
+  // helper removed; base58 conversion not used in prod UI
 
   
   const createWalletWrapper = () => {
@@ -204,9 +172,8 @@ export function MyCapsules() {
 
   useEffect(() => {
     if (connected && publicKey) {
-      loadUserCapsules();
+      void loadUserCapsules();
     }
-    
   }, [connected, publicKey]);
 
   const loadUserCapsules = async () => {
@@ -222,7 +189,22 @@ export function MyCapsules() {
       const solanaCapsules = await solanaService.getWalletCapsules(walletWrapper);
 
       
-      const transformedCapsules: Capsule[] = await Promise.all(solanaCapsules.map(async (solanaCapsule: Record<string, unknown>) => {
+      type RawCapsule = {
+        address: string;
+        mint?: string | { toString(): string };
+        title: string;
+        content: string;
+        unlockDate: { toNumber(): number };
+        createdAt: { toNumber(): number };
+        owner?: { toString(): string };
+        creator: { toString(): string };
+        isUnlocked: boolean;
+        transferredAt?: { toNumber(): number } | null;
+        mintCreator?: { toString(): string } | null;
+      };
+
+      const rawCapsules = solanaCapsules as unknown as RawCapsule[];
+      const transformedCapsules: Capsule[] = await Promise.all(rawCapsules.map(async (solanaCapsule) => {
         let contentData;
         try {
           contentData = JSON.parse(solanaCapsule.content as string);
@@ -233,8 +215,8 @@ export function MyCapsules() {
         let imageUrl = '';
         
         
-        const isTransferred = solanaCapsule.transferredAt && 
-          (solanaCapsule.owner as any)?.toString() !== (solanaCapsule.creator as any)?.toString();
+        const isTransferred = !!solanaCapsule.transferredAt && 
+          (solanaCapsule.owner?.toString() || '') !== solanaCapsule.creator.toString();
         
         // Processing transferred capsule silently
         
@@ -249,9 +231,9 @@ export function MyCapsules() {
                   encryptedUrl: contentData.encryptedImageUrl,
                   iv: contentData.encryptedImageIv
                 },
-                new PublicKey(solanaCapsule.creator as any),
+                new PublicKey(solanaCapsule.creator.toString()),
                 solanaCapsule.title as string,
-                (solanaCapsule.unlockDate as any).toNumber()
+                solanaCapsule.unlockDate.toNumber()
               );
               
               if (decryptedImageUrl) {
@@ -275,7 +257,7 @@ export function MyCapsules() {
                       },
                       publicKey!,
                       solanaCapsule.title as string,
-                      (solanaCapsule.unlockDate as any).toNumber(),
+                      solanaCapsule.unlockDate.toNumber(),
                       publicKey!.toString()
                     );
                     imageUrl = decryptedImageUrl.decryptedUrl;
@@ -299,7 +281,7 @@ export function MyCapsules() {
                 },
                 publicKey!,
                 solanaCapsule.title as string,
-                (solanaCapsule.unlockDate as any).toNumber(),
+                solanaCapsule.unlockDate.toNumber(),
                 publicKey!.toString() 
               );
               imageUrl = decryptedImageUrl.decryptedUrl;
@@ -314,7 +296,7 @@ export function MyCapsules() {
                   },
                   publicKey!,
                   (solanaCapsule.title as string).trim(), 
-                  (solanaCapsule.unlockDate as any).toNumber(),
+                  solanaCapsule.unlockDate.toNumber(),
                   publicKey!.toString() 
                 );
                 imageUrl = decryptedImageUrl.decryptedUrl;
@@ -326,7 +308,7 @@ export function MyCapsules() {
         } else if (!solanaCapsule.isUnlocked && contentData.encryptedImageUrl) {
           // Check if capsule should be unlocked based on time
           const currentTime = Math.floor(Date.now() / 1000);
-          if ((solanaCapsule.unlockDate as any).toNumber() <= currentTime) {
+          if (solanaCapsule.unlockDate.toNumber() <= currentTime) {
             // Try to decrypt image for time-unlocked capsule
             try {
               const decryptedImageUrl = await encryptionService.decryptPinataUrl(
@@ -336,7 +318,7 @@ export function MyCapsules() {
                 },
                 publicKey!,
                 solanaCapsule.title as string,
-                (solanaCapsule.unlockDate as any).toNumber(),
+                solanaCapsule.unlockDate.toNumber(),
                 publicKey!.toString()
               );
               imageUrl = decryptedImageUrl.decryptedUrl;
@@ -350,7 +332,7 @@ export function MyCapsules() {
                   },
                   publicKey!,
                   (solanaCapsule.title as string).trim(),
-                  (solanaCapsule.unlockDate as any).toNumber(),
+                  solanaCapsule.unlockDate.toNumber(),
                   publicKey!.toString()
                 );
                 imageUrl = decryptedImageUrl.decryptedUrl;
@@ -367,25 +349,25 @@ export function MyCapsules() {
           }
         }
 
-        const capsule = {
-          id: solanaCapsule.address as string,
-          mint: (solanaCapsule.mint as any)?.toString() || '',
-          name: solanaCapsule.title as string,
+        const capsule: Capsule = {
+          id: solanaCapsule.address,
+          mint: typeof solanaCapsule.mint === 'object' ? solanaCapsule.mint?.toString() || '' : (solanaCapsule.mint || ''),
+          name: solanaCapsule.title,
           description: contentData.description || 'No description',
           imageUrl: imageUrl,
-          unlockDate: new Date((solanaCapsule.unlockDate as any).toNumber() * 1000),
-          createdAt: new Date((solanaCapsule.createdAt as any).toNumber() * 1000),
-          owner: (solanaCapsule.owner as any)?.toString() || (solanaCapsule.creator as any).toString(), 
+          unlockDate: new Date(solanaCapsule.unlockDate.toNumber() * 1000),
+          createdAt: new Date(solanaCapsule.createdAt.toNumber() * 1000),
+          owner: solanaCapsule.owner?.toString() || solanaCapsule.creator.toString(), 
           isLocked: !solanaCapsule.isUnlocked,
           metadata: {
             attributes: [
-              { trait_type: 'Unlock Date', value: new Date((solanaCapsule.unlockDate as any).toNumber() * 1000).toISOString() },
+              { trait_type: 'Unlock Date', value: new Date(solanaCapsule.unlockDate.toNumber() * 1000).toISOString() },
               { trait_type: 'Status', value: solanaCapsule.isUnlocked ? 'Unlocked' : 'Locked' },
-              { trait_type: 'Creator', value: (solanaCapsule.creator as any).toString() }
+              { trait_type: 'Creator', value: solanaCapsule.creator.toString() }
             ],
-            creator: (solanaCapsule.creator as any).toString(),
-            transferredAt: (solanaCapsule.transferredAt as any) ? (solanaCapsule.transferredAt as any).toNumber() : null,
-            mintCreator: (solanaCapsule.mintCreator as any)?.toString() || null
+            creator: solanaCapsule.creator.toString(),
+            transferredAt: solanaCapsule.transferredAt ? solanaCapsule.transferredAt.toNumber() : undefined,
+            mintCreator: solanaCapsule.mintCreator ? solanaCapsule.mintCreator.toString() : undefined
           }
         };
 
@@ -395,8 +377,8 @@ export function MyCapsules() {
       
       const capsulesWithNFTStatus = await Promise.all(transformedCapsules.map(async (capsule) => {
         
-        let transactionSignature = capsule.mint || capsule.metadata?.mintCreator || undefined;
-        let updatedCapsule = { ...capsule };
+        let transactionSignature: string | undefined = capsule.mint || capsule.metadata?.mintCreator || undefined;
+        const updatedCapsule: Capsule = { ...capsule };
         
         
         if (updatedCapsule.mint && !updatedCapsule.metadata?.assetId) {
@@ -495,7 +477,7 @@ export function MyCapsules() {
         
         // If the capsule has been transferred (has transferredAt timestamp) and current user is not the owner, exclude it
         if (capsule.metadata?.transferredAt && !isCurrentOwner) {
-          console.log(`🔄 Filtering out transferred capsule: ${capsule.name} (transferred to ${capsule.owner})`);
+          // Filter out transferred capsules not owned by current user
           return false;
         }
         
@@ -503,7 +485,7 @@ export function MyCapsules() {
         if (capsule.metadata?.creator && 
             capsule.owner !== capsule.metadata.creator && 
             !isCurrentOwner) {
-          console.log(`🔄 Filtering out capsule with different owner: ${capsule.name} (owned by ${capsule.owner})`);
+          // Filter out capsules owned by others
           return false;
         }
         
@@ -566,7 +548,8 @@ export function MyCapsules() {
       const mintResult = await nftService.mintCapsule(
         {
           publicKey,
-          signTransaction: signTransaction!,
+          // Cast to generic signer to satisfy cnft wallet type without altering runtime behavior
+          signTransaction: (signTransaction as unknown) as <T>(t: T) => Promise<T>,
           signMessage: signMessage!
         },
         {
@@ -905,20 +888,7 @@ export function MyCapsules() {
     return new Date() >= unlockDate;
   };
 
-  const getTimeUntilUnlock = (unlockDate: Date) => {
-    const now = new Date();
-    const diff = unlockDate.getTime() - now.getTime();
-    
-    if (diff <= 0) return 'Unlocked';
-    
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (days > 0) return `${days}d ${hours}h`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-  };
+  const getTimeUntilUnlock = (unlockDate: Date) => getTimeUntil(unlockDate);
 
   if (!connected) {
     return (
@@ -1025,6 +995,7 @@ export function MyCapsules() {
             <div className="relative h-64 overflow-hidden bg-black/30">
               {capsule.imageUrl && !capsule.isLocked ? (
                 <div className="relative h-full">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={capsule.imageUrl}
                     alt={capsule.name}
@@ -1055,6 +1026,7 @@ export function MyCapsules() {
                       <div className="space-y-3">
                         {capsule.imageUrl ? (
                           <div>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={capsule.imageUrl}
                               alt={capsule.name}
@@ -1270,6 +1242,7 @@ export function MyCapsules() {
                 {}
                 {selectedCapsule.imageUrl && !selectedCapsule.isLocked && (
                   <div className="relative overflow-hidden rounded-2xl shadow-lg group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={selectedCapsule.imageUrl}
                       alt={selectedCapsule.name}
@@ -1816,26 +1789,7 @@ export function MyCapsules() {
 
       {}
       {showFullscreenImage && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setShowFullscreenImage(null)}>
-          <div className="relative max-w-5xl max-h-full">
-            <img
-              src={showFullscreenImage}
-              alt="Fullscreen view"
-              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowFullscreenImage(null);
-              }}
-              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 border-white/30 text-white hover:border-white/60 transition-all duration-300"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <FullscreenImageOverlay imageUrl={showFullscreenImage} onClose={() => setShowFullscreenImage(null)} />
       )}
 
       {}
