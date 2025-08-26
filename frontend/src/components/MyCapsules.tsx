@@ -13,6 +13,7 @@ import { solanaService } from '@/services/solana';
 import { encryptionService } from '@/services/encryption';
 import { nftService, CNFTMintOptions } from '@/services/nft';
 import { cnftService } from '@/services/cnft';
+import { combinedTransferService, CombinedTransferError } from '@/services/combined-transfer';
 import { MintTransactionStatus } from '@/services/helius-das';
 import { PublicKey } from '@solana/web3.js';
 import { CapsuleUpdateModal } from '@/components/CapsuleUpdateModal';
@@ -487,7 +488,30 @@ export function MyCapsules() {
         };
       }));
       
-      setUserCapsules(capsulesWithNFTStatus);
+      // Filter out transferred capsules - only show capsules where current user is the owner
+      const ownedCapsules = capsulesWithNFTStatus.filter(capsule => {
+        // Check if current user is the owner of the capsule
+        const isCurrentOwner = capsule.owner === publicKey?.toString();
+        
+        // If the capsule has been transferred (has transferredAt timestamp) and current user is not the owner, exclude it
+        if (capsule.metadata?.transferredAt && !isCurrentOwner) {
+          console.log(`🔄 Filtering out transferred capsule: ${capsule.name} (transferred to ${capsule.owner})`);
+          return false;
+        }
+        
+        // Also check if the owner is different from the creator and current user is not the owner
+        if (capsule.metadata?.creator && 
+            capsule.owner !== capsule.metadata.creator && 
+            !isCurrentOwner) {
+          console.log(`🔄 Filtering out capsule with different owner: ${capsule.name} (owned by ${capsule.owner})`);
+          return false;
+        }
+        
+        // Keep capsule if current user is the owner
+        return isCurrentOwner;
+      });
+      
+      setUserCapsules(ownedCapsules);
     } catch {
       toast.error('Failed to load capsules. Please refresh and try again.');
     } finally {
@@ -679,49 +703,20 @@ export function MyCapsules() {
   };
 
   
-  const getTransferButtonInfo = (capsule: Capsule): { text: string; canTransfer: boolean; transferType: 'capsule' | 'cnft' | 'both' | 'none' | 'cnft-only' } => {
-    const isOwner = isCurrentOwner(capsule);
-    const hasCNFT = hasAssociatedCNFT(capsule);
-    
-    if (!isOwner) {
-      
-      if (hasCNFT) {
-        return { text: 'Transfer cNFT', canTransfer: true, transferType: 'cnft-only' };
-      }
-      return { text: 'Not Owner', canTransfer: false, transferType: 'none' };
-    }
-    
-    if (hasCNFT) {
-      return { text: 'Transfer Capsule & cNFT', canTransfer: true, transferType: 'both' };
-    }
-    
-    return { text: 'Transfer Capsule', canTransfer: true, transferType: 'capsule' };
-  };
-
-  
-  const getTransferButtonText = (capsule: Capsule): string => {
-    const { text } = getTransferButtonInfo(capsule);
-    return text;
+  const canTransferCapsuleAndCNFT = (capsule: Capsule): boolean => {
+    return isCurrentOwner(capsule) && !capsule.isLocked && hasMintedNFT(capsule);
   };
 
   const handleTransferNFT = async (capsule: Capsule) => {
     if (!publicKey || !signTransaction || !signMessage) return;
 
-    
-    const isTransferredCapsule = !isCurrentOwner(capsule) && hasAssociatedCNFT(capsule);
-    
-    if (isTransferredCapsule) {
-      
-      await handleCNFTOnlyTransfer(capsule);
-      return;
-    }
-
-    
+    // Validate ownership
     if (capsule.owner !== publicKey.toString()) {
       toast.error('Only the capsule owner can transfer this capsule');
       return;
     }
 
+    // Validate address
     const cleanAddress = transferAddress.trim();
     if (!cleanAddress) {
       toast.error('Please enter a valid recipient address');
@@ -735,65 +730,65 @@ export function MyCapsules() {
       return;
     }
 
+    // Validate capsule has cNFT
+    if (!capsule.metadata?.assetId) {
+      toast.error('This capsule does not have an associated cNFT to transfer');
+      return;
+    }
+
     setTransferring(capsule.id);
 
     try {
-      toast.loading('Transferring capsule...', { id: 'transfer' });
-
-      // Starting capsule transfer
-
+      const walletWrapper = createWalletWrapper()!;
       
-      const transferResult = await solanaService.transferCapsule(
-        createWalletWrapper()!,
-        capsule.id,
-        cleanAddress
-      );
-
+      toast.loading('Transferring capsule and cNFT...', { id: 'transfer' });
       
-      if (transferCNFT && capsule.mint && capsule.metadata?.assetId) {
-        try {
-          toast.loading('Transferring CNFT...', { id: 'cnft-transfer' });
-          
-          
-          await cnftService.initialize({
-            publicKey,
-            signTransaction: signTransaction!,
-            signMessage: signMessage!
-          });
-
-          
-          const cnftTransferSignature = await cnftService.transferCNFT({
-            assetId: capsule.metadata.assetId,
-            newOwner: cleanAddress, 
-          });
-
-          // CNFT transfer successful
-          toast.success('🎉 CNFT transferred successfully!', { id: 'cnft-transfer' });
-        } catch (cnftError) {
-          console.error('CNFT transfer failed:', cnftError);
-          toast.error(`CNFT transfer failed: ${cnftError instanceof Error ? cnftError.message : 'Unknown error'}`, { id: 'cnft-transfer' });
-          
-        }
-      } else if (transferCNFT && (!capsule.mint || !capsule.metadata?.assetId)) {
-        
-        toast.error('⚠️ CNFT transfer requested but this capsule has no associated compressed NFT', { id: 'cnft-transfer' });
-      }
-
-      toast.success('🎉 Capsule transferred successfully!', { id: 'transfer' });
-
+      // Always transfer both capsule and cNFT together
+      const result = await combinedTransferService.transferCapsuleWithCNFT(walletWrapper, {
+        capsuleAddress: capsule.id,
+        newOwner: cleanAddress,
+        assetId: capsule.metadata.assetId,
+        includeCNFT: true,
+      });
       
+      toast.success('🎉 Capsule and cNFT transferred successfully!', { id: 'transfer' });
+      console.log('Transfer results:', {
+        capsule: result.capsuleSignature,
+        cnft: result.cnftSignature,
+        transferred: result.transferredAssets
+      });
+
+      // Remove from sender's UI immediately
       const updatedCapsules = userCapsules.filter((c: Capsule) => c.id !== capsule.id);
       setUserCapsules(updatedCapsules);
       
-      
+      // Refresh to sync with blockchain and ensure consistency
       setTimeout(() => {
         loadUserCapsules();
-      }, 1000);
+      }, 2000);
 
     } catch (error) {
       console.error('Transfer error details:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Transfer failed: ${errorMessage}`, { id: 'transfer' });
+      
+      if (error instanceof CombinedTransferError) {
+        if (error.capsuleTransferSuccess && !error.cnftTransferSuccess) {
+          toast.error('⚠️ Capsule transferred but cNFT transfer failed. The capsule ownership has changed but the cNFT remains with you.', { id: 'transfer' });
+          
+          // Still remove from UI since capsule ownership changed
+          const updatedCapsules = userCapsules.filter((c: Capsule) => c.id !== capsule.id);
+          setUserCapsules(updatedCapsules);
+          
+          // Refresh to ensure consistency
+          setTimeout(() => {
+            loadUserCapsules();
+          }, 2000);
+        } else {
+          toast.error(`Transfer failed: ${error.message}`, { id: 'transfer' });
+        }
+      } else {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        toast.error(`Transfer failed: ${errorMessage}`, { id: 'transfer' });
+      }
     } finally {
       setTransferring(null);
       setShowTransferDialog(null);
@@ -802,59 +797,7 @@ export function MyCapsules() {
     }
   };
 
-  const handleCNFTOnlyTransfer = async (capsule: Capsule) => {
-    if (!publicKey || !signTransaction || !signMessage) return;
 
-    const cleanAddress = transferAddress.trim();
-    if (!cleanAddress) {
-      toast.error('Please enter a valid recipient address');
-      return;
-    }
-
-    try {
-      new PublicKey(cleanAddress);
-    } catch {
-      toast.error('Please enter a valid Solana wallet address');
-      return;
-    }
-
-    setTransferring(capsule.id);
-
-    try {
-      toast.loading('Transferring CNFT...', { id: 'cnft-transfer' });
-
-      // Starting CNFT-only transfer
-
-      
-      await cnftService.initialize({
-        publicKey,
-        signTransaction: signTransaction!,
-        signMessage: signMessage!
-      });
-
-      
-      const cnftTransferSignature = await cnftService.transferCNFT({
-        assetId: capsule.metadata.assetId!,
-        newOwner: cleanAddress, 
-      });
-
-      // CNFT transfer successful
-      toast.success('🎉 CNFT transferred successfully!', { id: 'cnft-transfer' });
-
-      
-      
-
-    } catch (error) {
-      console.error('CNFT-only transfer error details:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`CNFT-only transfer failed: ${errorMessage}`, { id: 'cnft-transfer' });
-    } finally {
-      setTransferring(null);
-      setShowTransferDialog(null);
-      setTransferAddress('');
-      setTransferCNFT(false);
-    }
-  };
 
   const handleUnlockCapsule = async (capsule: Capsule) => {
     if (!publicKey || !signTransaction || !signMessage) return;
@@ -1233,37 +1176,19 @@ export function MyCapsules() {
 
 
                     {}
-                    {isCurrentOwner(capsule) && (
+                    {canTransferCapsuleAndCNFT(capsule) && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const { transferType } = getTransferButtonInfo(capsule);
                           setShowTransferDialog(capsule.id);
-                          setTransferCNFT(transferType === 'both'); 
+                          setTransferCNFT(true); // Always transfer both capsule and cNFT
                         }}
                         className="flex-1 min-w-[120px] bg-white/5 hover:bg-blue-400/10 text-white hover:text-blue-200 border-blue-400/30 hover:border-blue-400/60 transition-all duration-300 px-4 py-2.5 rounded-xl"
-                        disabled={transferring === capsule.id || !getTransferButtonInfo(capsule).canTransfer}
-                      >
-                        <ArrowRightLeft className="mr-2 h-4 w-4" />
-                        {getTransferButtonText(capsule)}
-                      </Button>
-                    )}
-
-                    {}
-                    {!isCurrentOwner(capsule) && hasAssociatedCNFT(capsule) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setShowTransferDialog(capsule.id);
-                          setTransferCNFT(true); 
-                        }}
-                        className="flex-1 min-w-[120px] bg-white/5 hover:bg-purple-400/10 text-white hover:text-purple-200 border-purple-400/30 hover:border-purple-400/60 transition-all duration-300 px-4 py-2.5 rounded-xl"
                         disabled={transferring === capsule.id}
                       >
                         <ArrowRightLeft className="mr-2 h-4 w-4" />
-                        Transfer cNFT
+                        Transfer Capsule & cNFT
                       </Button>
                     )}
 
@@ -1570,48 +1495,6 @@ export function MyCapsules() {
         const capsule = userCapsules.find(c => c.id === showTransferDialog);
         if (!capsule) return null;
         
-        const { transferType } = getTransferButtonInfo(capsule);
-        const isOwner = isCurrentOwner(capsule);
-        const isTransferredCapsule = !isOwner && hasAssociatedCNFT(capsule);
-        
-        if (!isOwner && !isTransferredCapsule) {
-          return (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-              <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] border border-amber-400/30 backdrop-blur-xl overflow-hidden">
-                <div className="p-8 overflow-y-auto max-h-[calc(90vh-64px)]">
-                  <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-400 to-red-600 rounded-3xl mb-6 shadow-2xl shadow-red-400/30">
-                      <X className="h-10 w-10 text-white" />
-                    </div>
-                    <h2 className="text-3xl font-black text-white mb-3">Access Denied</h2>
-                    <p className="text-lg text-gray-300 leading-relaxed">
-                      Only the capsule owner can transfer this capsule
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <Button
-                      onClick={() => {
-                        setShowTransferDialog(null);
-                        setTransferAddress('');
-                        setTransferCNFT(false);
-                      }}
-                      className="bg-white/5 hover:bg-red-400/10 border-red-400/30 hover:border-red-400/60 text-white hover:text-red-100 transition-all duration-300 py-3 px-8 rounded-xl font-semibold"
-                    >
-                      Close
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        }
-        
-        
-        let dialogTransferType = transferType;
-        if (isTransferredCapsule) {
-          dialogTransferType = 'cnft-only';
-        }
-        
         return (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
             <div className="bg-gradient-to-br from-black/40 via-black/20 to-amber-950/20 rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] border border-amber-400/30 backdrop-blur-xl overflow-hidden">
@@ -1620,17 +1503,9 @@ export function MyCapsules() {
                   <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-3xl mb-6 shadow-2xl shadow-amber-400/30">
                     <ArrowRightLeft className="h-10 w-10 text-black" />
                   </div>
-                  <h2 className="text-3xl font-black text-white mb-3">
-                    {dialogTransferType === 'both' ? 'Transfer Capsule & cNFT' : 
-                     dialogTransferType === 'cnft-only' ? 'Transfer cNFT' : 'Transfer Capsule'}
-                  </h2>
+                  <h2 className="text-3xl font-black text-white mb-3">Transfer Capsule & cNFT</h2>
                   <p className="text-lg text-gray-300 leading-relaxed">
-                    {dialogTransferType === 'both' 
-                      ? 'Transfer both your memory capsule and the associated cNFT to another wallet'
-                      : dialogTransferType === 'cnft-only'
-                      ? 'Transfer the compressed NFT associated with this capsule to another wallet'
-                      : 'Transfer your memory capsule to another wallet (capsule only, not the NFT)'
-                    }
+                    Transfer both your memory capsule and the associated cNFT to another wallet
                   </p>
                 </div>
                 <div className="space-y-6">
@@ -1657,39 +1532,15 @@ export function MyCapsules() {
                     )}
                   </div>
 
-                  {}
-                  {dialogTransferType === 'both' && (
-                    <div className="flex items-center space-x-3 p-4 bg-white/5 rounded-xl border border-amber-400/20">
-                      <input
-                        type="checkbox"
-                        id="transferCNFT"
-                        checked={transferCNFT}
-                        onChange={(e) => setTransferCNFT(e.target.checked)}
-                        className="w-5 h-5 text-amber-500 bg-transparent border-amber-400 rounded focus:ring-amber-400 focus:ring-2"
-                      />
-                      <label htmlFor="transferCNFT" className="text-white text-sm leading-relaxed">
-                        <span className="font-semibold">Also transfer the associated cNFT</span>
-                        <br />
-                        <span className="text-gray-300 text-xs">
-                          This will transfer both the capsule ownership and the compressed NFT to the recipient
-                        </span>
-                      </label>
+                  <div className="p-4 bg-blue-500/10 rounded-xl border border-blue-400/20">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                      <span className="text-blue-300 font-semibold text-sm">Both Assets Will Be Transferred</span>
                     </div>
-                  )}
-
-                  {}
-                  {dialogTransferType === 'cnft-only' && (
-                    <div className="p-4 bg-purple-500/10 rounded-xl border border-purple-400/20">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
-                        <span className="text-purple-300 font-semibold text-sm">CNFT Transfer Only</span>
-                      </div>
-                      <p className="text-gray-300 text-sm">
-                        You can transfer the compressed NFT associated with this capsule to another wallet. 
-                        The capsule ownership will remain unchanged.
-                      </p>
-                    </div>
-                  )}
+                    <p className="text-gray-300 text-sm">
+                      This will transfer both the capsule ownership and the compressed NFT to the recipient in a single atomic transaction.
+                    </p>
+                  </div>
 
                   <div className="flex gap-4 pt-4">
                     <Button
@@ -1707,8 +1558,7 @@ export function MyCapsules() {
                       ) : (
                         <>
                           <ArrowRightLeft className="mr-2 h-4 w-4" />
-                          {dialogTransferType === 'both' ? 'Transfer Capsule & cNFT' : 
-                           dialogTransferType === 'cnft-only' ? 'Transfer cNFT' : 'Transfer Capsule'}
+                          Transfer Capsule & cNFT
                         </>
                       )}
                     </Button>

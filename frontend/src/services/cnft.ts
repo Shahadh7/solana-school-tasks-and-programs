@@ -22,11 +22,11 @@ import {
   createTree,
   mintV1,
   MetadataArgsArgs,
+  transfer,
 } from '@metaplex-foundation/mpl-bubblegum'
 import bs58 from 'bs58'
 import { heliusDasService, DasApiAsset, MintTransactionStatus } from './helius-das'
 import { PublicKey } from '@solana/web3.js'
-const { transfer } = await import('@metaplex-foundation/mpl-bubblegum/dist/src/generated/instructions/transfer');
 
 export interface CNFTMetadata {
   name: string
@@ -321,22 +321,20 @@ class CNFTService {
 
   /**
    * Transfer a compressed NFT to another owner
-   * This implementation fetches asset data and merkle proofs from DAS API
+   * This implementation fetches asset data and merkle proofs from DAS API and constructs the transfer properly
    */
   async transferCNFT(params: {
     assetId: string
     newOwner: string | UmiPublicKey
-    merkleTree?: UmiPublicKey
-    leafIndex?: number
-    proof?: UmiPublicKey[]
   }): Promise<string> {
     try {
       const newOwnerKey = typeof params.newOwner === 'string' 
         ? createPublicKey(params.newOwner)
         : params.newOwner;
 
-      // Starting cNFT transfer
+      console.log('🔄 Starting cNFT transfer with improved implementation...');
 
+      // Fetch asset data from DAS API
       const asset = await heliusDasService.getAsset(params.assetId);
       if (!asset) {
         throw new Error('Asset not found in DAS API');
@@ -346,31 +344,69 @@ class CNFTService {
         throw new Error('Asset is not a compressed NFT');
       }
 
-      const merkleTree = params.merkleTree || createPublicKey(asset.compression.tree);
-      const leafIndex = params.leafIndex || asset.compression.leaf_id;
+      console.log('✅ Asset data fetched:', {
+        owner: asset.ownership?.owner,
+        delegate: asset.ownership?.delegate,
+        tree: asset.compression.tree
+      });
 
+      // Verify ownership
+      if (!asset.ownership) {
+        throw new Error('Asset ownership information not available');
+      }
+      
+      const currentOwner = asset.ownership.owner;
+      if (currentOwner !== this.umi.identity.publicKey.toString()) {
+        throw new Error(`Transfer denied: Asset owner is ${currentOwner}, but signer is ${this.umi.identity.publicKey.toString()}`);
+      }
+
+      // Fetch merkle proof
       const proofData = await heliusDasService.getAssetProof(params.assetId);
       if (!proofData) {
         throw new Error('Failed to fetch merkle proof for asset transfer');
       }
 
+      console.log('✅ Proof data fetched:', {
+        root: proofData.root,
+        proofLength: proofData.proof.length,
+        leafIndex: asset.compression.leaf_id
+      });
+
+      // Prepare transfer parameters
+      const merkleTree = createPublicKey(asset.compression.tree);
+      const leafIndex = asset.compression.leaf_id;
       const proof = proofData.proof.map(p => createPublicKey(p));
-
       
+      // Use the correct owner and delegate from the asset
+      const leafOwner = createPublicKey(asset.ownership.owner);
+      const leafDelegate = asset.ownership.delegate 
+        ? createPublicKey(asset.ownership.delegate) 
+        : leafOwner; // If no delegate, use owner
 
+      console.log('🔄 Creating transfer instruction with parameters:', {
+        leafOwner: leafOwner.toString(),
+        leafDelegate: leafDelegate.toString(),
+        newLeafOwner: newOwnerKey.toString(),
+        merkleTree: merkleTree.toString(),
+        leafIndex,
+        proofLength: proof.length
+      });
+
+      // Create transfer instruction
       const transferTx = transfer(this.umi, {
-        leafOwner: this.umi.identity.publicKey,
+        leafOwner,
+        leafDelegate,
         newLeafOwner: newOwnerKey,
         merkleTree,
         root: bs58.decode(proofData.root),
         dataHash: bs58.decode(asset.compression.data_hash),
         creatorHash: bs58.decode(asset.compression.creator_hash),
-        nonce: asset.compression.seq,
+        nonce: asset.compression.leaf_id,
         index: leafIndex,
         proof,
       });
 
-      // Sending transfer transaction
+      console.log('🔄 Sending transfer transaction...');
 
       const result = await transferTx.sendAndConfirm(this.umi, {
         send: { commitment: 'confirmed' },
@@ -390,11 +426,23 @@ class CNFTService {
         signature = String(result.signature);
       }
 
-      // cNFT transfer successful
+      console.log('✅ cNFT transfer successful:', signature);
 
       return signature;
     } catch (error) {
-      console.error('cNFT transfer failed:', error);
+      console.error('❌ cNFT transfer failed:', error);
+      
+      // Enhanced error logging for debugging
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          assetId: params.assetId,
+          newOwner: params.newOwner,
+          currentSigner: this.umi.identity?.publicKey?.toString()
+        });
+      }
+      
       throw new Error(`cNFT transfer failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
