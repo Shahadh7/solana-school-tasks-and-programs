@@ -122,12 +122,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
 
       const capsuleData: CapsuleData = {
         title: formData.name,
-        content: JSON.stringify({
-          description: formData.description,
-          encryptedImageUrl: encryptedData.encryptedUrl,
-          encryptedImageIv: encryptedData.iv,
-          unlockDate: unlockTimestamp
-        }),
+        content: `${formData.description}|IV:${encryptedData.iv}`, // Store description + IV in content field
         unlockDate: unlockTimestamp,
         encryptedImageUrl: encryptedData.encryptedUrl,
         encryptedImageIv: encryptedData.iv
@@ -426,8 +421,19 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
               placeholder="Enter a name for your capsule"
+              maxLength={100}
               className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
+            <div className="flex justify-between items-center mt-1">
+              <span className="text-xs text-gray-500">
+                {formData.name.length}/100 characters
+              </span>
+              {formData.name.length > 90 && (
+                <span className="text-xs text-amber-600">
+                  {formData.name.length > 100 ? '⚠️ Exceeds limit' : '⚠️ Approaching limit'}
+                </span>
+              )}
+            </div>
           </div>
 
           <div>
@@ -437,8 +443,22 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
               onChange={(e) => handleInputChange('description', e.target.value)}
               placeholder="Write a message to your future self..."
               rows={3}
+              maxLength={280}
               className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
+            <div className="flex justify-between items-center mt-1">
+              <span className="text-xs text-gray-500">
+                {formData.description.length}/280 characters
+              </span>
+              {formData.description.length > 250 && (
+                <span className="text-xs text-amber-600">
+                  {formData.description.length > 280 ? '⚠️ Exceeds limit' : '⚠️ Approaching limit'}
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              Note: The IV will be added automatically, leaving ~264 characters for your message
+            </div>
           </div>
 
           <div>

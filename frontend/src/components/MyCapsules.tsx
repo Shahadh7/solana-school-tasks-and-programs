@@ -194,6 +194,7 @@ export function MyCapsules() {
         mint?: string | { toString(): string };
         title: string;
         content: string;
+        encryptedUrl?: string | null;
         unlockDate: { toNumber(): number };
         createdAt: { toNumber(): number };
         owner?: { toString(): string };
@@ -206,9 +207,22 @@ export function MyCapsules() {
       const rawCapsules = solanaCapsules as unknown as RawCapsule[];
       const transformedCapsules: Capsule[] = await Promise.all(rawCapsules.map(async (solanaCapsule) => {
         let contentData;
-        try {
-          contentData = JSON.parse(solanaCapsule.content as string);
-        } catch {
+        let description: string;
+        let iv: string;
+        
+        // Parse the new format: "description|IV:iv_string"
+        const contentParts = (solanaCapsule.content as string).split('|IV:');
+        if (contentParts.length === 2 && solanaCapsule.encryptedUrl) {
+          description = contentParts[0];
+          iv = contentParts[1];
+          contentData = { 
+            description,
+            encryptedImageUrl: solanaCapsule.encryptedUrl,
+            encryptedImageIv: iv
+          };
+        } else {
+          // Fallback for old format or plain text
+          description = solanaCapsule.content as string;
           contentData = { description: solanaCapsule.content };
         }
 
@@ -830,10 +844,22 @@ export function MyCapsules() {
       
       
       let contentData;
-      try {
-        contentData = JSON.parse(currentCapsule.content as string);
-      } catch {
-        throw new Error('Failed to parse capsule content');
+      let description: string;
+      let iv: string;
+      
+      // Parse the new format: "description|IV:iv_string"
+      const contentParts = (currentCapsule.content as string).split('|IV:');
+      if (contentParts.length === 2) {
+        description = contentParts[0];
+        iv = contentParts[1];
+        contentData = { 
+          description,
+          encryptedImageUrl: currentCapsule.encryptedUrl,
+          encryptedImageIv: iv
+        };
+      } else {
+        // Fallback for old format or plain text
+        throw new Error('Failed to parse capsule content - invalid format');
       }
       
       
