@@ -36,17 +36,13 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
   const subscriptionsRef = useRef<Map<string, string>>(new Map());
   const eventListenersRef = useRef<Map<WebSocketEventType, (event: WebSocketEvent) => void>>(new Map());
 
-  /**
-   * Update WebSocket status
-   */
+
   const updateStatus = useCallback(() => {
     const wsStatus = heliusWebSocket.getConnectionStatus();
     setStatus(wsStatus);
   }, []);
 
-  /**
-   * Subscribe to account changes
-   */
+
   const subscribeToAccount = useCallback(async (
     publicKey: PublicKey,
     callback?: (accountInfo: Record<string, unknown>) => void
@@ -77,9 +73,7 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
     }
   }, [updateStatus]);
 
-  /**
-   * Unsubscribe from account changes
-   */
+
   const unsubscribeFromAccount = useCallback(async (publicKey: PublicKey) => {
     const key = `account-${publicKey.toString()}`;
     const subscriptionKey = subscriptionsRef.current.get(key);
@@ -96,9 +90,7 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
     }
   }, [updateStatus]);
 
-  /**
-   * Monitor transaction confirmation
-   */
+
   const monitorTransaction = useCallback(async (
     signature: string,
     onUpdate?: (status: TransactionStatus) => void
@@ -154,9 +146,7 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
     }
   }, [updateStatus]);
 
-  /**
-   * Subscribe to slot changes
-   */
+
   const subscribeToSlots = useCallback(async (
     callback?: (slot: number) => void
   ): Promise<string | null> => {
@@ -187,9 +177,7 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
     }
   }, [updateStatus]);
 
-  /**
-   * Add global event listener
-   */
+
   const addEventListener = useCallback((
     eventType: WebSocketEventType,
     listener: (event: WebSocketEvent) => void
@@ -198,9 +186,7 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
     eventListenersRef.current.set(eventType, listener);
   }, []);
 
-  /**
-   * Remove global event listener
-   */
+
   const removeEventListener = useCallback((
     eventType: WebSocketEventType
   ) => {
@@ -211,9 +197,7 @@ export function useHeliusWebSocket(options: UseHeliusWebSocketOptions = {}) {
     }
   }, []);
 
-  /**
-   * Cleanup all subscriptions
-   */
+
   const cleanup = useCallback(async () => {
     const subscriptions = Array.from(subscriptionsRef.current.entries());
     for (const [key, subscriptionKey] of subscriptions) {

@@ -32,9 +32,7 @@ export function getSolscanUrl(type: 'tx' | 'account' | 'token', identifier: stri
   return `https://solscan.io/${type}/${identifier}${cluster}`
 }
 
-/**
- * Generate Solana Explorer URL with proper cluster parameter based on current network configuration
- */
+
 export function getSolanaExplorerUrl(type: 'tx' | 'address' | 'block', identifier: string): string {
   const network = getNetwork()
   

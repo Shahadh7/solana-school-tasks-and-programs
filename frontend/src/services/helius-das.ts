@@ -117,9 +117,7 @@ export interface MintTransactionStatus {
   timestamp: number
 }
 
-/**
- * Helius DAS API Service
- */
+
 class HeliusDasService {
   private baseUrl: string
   private apiKey: string
@@ -135,16 +133,12 @@ class HeliusDasService {
     }
   }
 
-  /**
-   * Get the DAS API URL with API key
-   */
+
   private getDasUrl(): string {
     return `${this.baseUrl}/v0`
   }
 
-  /**
-   * Make a request to the DAS API
-   */
+
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.getDasUrl()}${endpoint}?api-key=${this.apiKey}`
     
@@ -164,12 +158,9 @@ class HeliusDasService {
     return response.json()
   }
 
-  /**
-   * Get asset by ID
-   */
+
   async getAsset(assetId: string): Promise<DasApiAsset | null> {
     try {
-      // Fetching asset silently
       
       const response = await fetch(`${this.baseUrl}/?api-key=${this.apiKey}`, {
         method: 'POST',
@@ -200,15 +191,12 @@ class HeliusDasService {
     }
   }
 
-  /**
-   * Get assets by owner using getAssetsByOwner (recommended method)
-   */
+
   async getAssetsByOwner(
     ownerAddress: string, 
     options: AssetsByOwnerOptions = {}
   ): Promise<DasApiResponse<DasApiAsset>> {
     try {
-      // Fetching assets for owner silently
       
       const {
         page = 1,
@@ -257,7 +245,6 @@ class HeliusDasService {
       }
 
       const result = data.result;
-      // Found assets for owner silently
       return result;
     } catch (error) {
       console.error('Failed to fetch assets by owner:', error)
@@ -265,9 +252,7 @@ class HeliusDasService {
     }
   }
 
-  /**
-   * Get compressed NFTs for a wallet (filtered for memory capsules)
-   */
+
   async getCapsuleNFTs(walletAddress: PublicKey): Promise<DasApiAsset[]> {
     try {
       const response = await this.getAssetsByOwner(walletAddress.toString(), {
@@ -289,7 +274,6 @@ class HeliusDasService {
         return isCompressed && isCapsule
       })
 
-      // Found capsule cNFTs for wallet silently
       return capsuleNFTs
     } catch (error) {
       console.error('Failed to fetch capsule cNFTs:', error)
@@ -297,15 +281,12 @@ class HeliusDasService {
     }
   }
 
-  /**
-   * Monitor minting transaction with real-time updates
-   */
+
   async monitorMintTransaction(
     signature: string,
     onUpdate: (status: MintTransactionStatus) => void
   ): Promise<void> {
     try {
-      // Starting transaction monitoring silently
       
       onUpdate({
         signature,
@@ -383,10 +364,7 @@ class HeliusDasService {
     }
   }
 
-  /**
-   * Get proof for compressed NFT transfer
-   * This method fetches merkle proofs from Helius DAS API
-   */
+
   async getAssetProof(assetId: string): Promise<{
     root: string
     proof: string[]
@@ -395,7 +373,6 @@ class HeliusDasService {
     tree_id: string
   } | null> {
     try {
-      // Fetching proof for asset silently
       
       const response = await fetch(`${this.baseUrl}/?api-key=${this.apiKey}`, {
         method: 'POST',
@@ -419,7 +396,6 @@ class HeliusDasService {
         throw new Error(`DAS API error: ${data.error.message}`);
       }
 
-      // Asset proof fetched successfully
       return data.result;
     } catch (error) {
       console.error('Failed to fetch asset proof:', error);
@@ -427,9 +403,7 @@ class HeliusDasService {
     }
   }
 
-  /**
-   * Check if a capsule is ready to be unlocked
-   */
+
   isReadyToUnlock(asset: DasApiAsset): boolean {
     try {
       const unlockDateAttr = asset.content?.metadata?.attributes?.find(
@@ -448,9 +422,7 @@ class HeliusDasService {
     }
   }
 
-  /**
-   * Check if DAS API is available
-   */
+
   async healthCheck(): Promise<boolean> {
     try {
       const response = await fetch(`${this.getDasUrl()}/health?api-key=${this.apiKey}`)
@@ -461,9 +433,7 @@ class HeliusDasService {
     }
   }
 
-  /**
-   * Get API configuration status
-   */
+
   getConfig(): {
     hasApiKey: boolean
     baseUrl: string
@@ -517,16 +487,12 @@ class HeliusDasService {
     }
   }
 
-  /**
-   * Search for cNFTs that match a specific capsule name
-   * This is more efficient than getting all assets and filtering
-   */
+
   async searchCNFTsByCapsuleName(
     ownerAddress: string,
     capsuleName: string
   ): Promise<DasApiAsset[]> {
     try {
-      // Searching for cNFTs matching capsule name silently
       
       const allAssets = await this.getAssetsByOwner(ownerAddress, {
         limit: 1000,
@@ -543,7 +509,6 @@ class HeliusDasService {
         return isCompressed && nameMatches;
       });
       
-      // Found matching cNFTs silently
       return matchingCNFTs;
     } catch (error) {
       console.error('Failed to search cNFTs by capsule name:', error)

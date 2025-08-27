@@ -8,9 +8,6 @@ export interface RPCConfig {
   httpHeaders?: Record<string, string>;
 }
 
-/**
- * Get optimized RPC configuration for Helius or fallback
- */
 export function getRPCConfig(): RPCConfig {
   const network = WalletAdapterNetwork.Devnet;
   
@@ -34,9 +31,6 @@ export function getRPCConfig(): RPCConfig {
   };
 }
 
-/**
- * Create optimized connection for Helius
- */
 export function createOptimizedConnection(): Connection {
   const config = getRPCConfig();
   const wsEndpoint = getWebSocketEndpoint();
@@ -52,9 +46,6 @@ export function createOptimizedConnection(): Connection {
   );
 }
 
-/**
- * Get the proper WebSocket endpoint for Helius
- */
 export function getWebSocketEndpoint(): string {
   const dedicatedWsUrl = process.env.NEXT_PUBLIC_HELIUS_WEBSOCKET_URL;
   if (dedicatedWsUrl) {
@@ -79,31 +70,19 @@ export function getWebSocketEndpoint(): string {
   return httpEndpoint.replace('https://', 'wss://');
 }
 
-/**
- * Get the current RPC endpoint
- */
 export function getRPCEndpoint(): string {
   return getRPCConfig().endpoint;
 }
 
-/**
- * Check if using Helius RPC
- */
 export function isUsingHelius(): boolean {
   const endpoint = getRPCEndpoint();
   return endpoint.includes('helius-rpc.com');
 }
 
-/**
- * Check if using dedicated WebSocket URL
- */
 export function isUsingDedicatedWebSocket(): boolean {
   return !!process.env.NEXT_PUBLIC_HELIUS_WEBSOCKET_URL;
 }
 
-/**
- * Get WebSocket configuration info for debugging
- */
 export function getWebSocketInfo(): {
   endpoint: string;
   isDedicated: boolean;
@@ -121,9 +100,6 @@ export function getWebSocketInfo(): {
   };
 }
 
-/**
- * Get network type from environment or default
- */
 export function getNetwork(): WalletAdapterNetwork {
   const networkEnv = process.env.NEXT_PUBLIC_NETWORK?.toLowerCase();
   

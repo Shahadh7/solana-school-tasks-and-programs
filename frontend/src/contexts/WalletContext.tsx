@@ -27,7 +27,7 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
   
   
   const network = useMemo(() => getNetwork(), []);
-  void network; // keep computed for potential UI toggles; suppress unused var warning
+  void network;
 
 
 

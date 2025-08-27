@@ -109,7 +109,6 @@ class SolanaService {
       return null;
     }
 
-    // Ensure fee payer and recent blockhash are set for wallet adapters
     if (transaction instanceof Transaction) {
       transaction.feePayer = wallet.publicKey;
       const latest = await this.connection.getLatestBlockhash('finalized');
@@ -121,12 +120,10 @@ class SolanaService {
       skipPreflight: false,
     });
 
-    // Confirm using the same blockhash context when possible
     try {
       const latest = await this.connection.getLatestBlockhash('confirmed');
       await this.connection.confirmTransaction({ signature, ...latest }, 'confirmed');
     } catch {
-      // Non-fatal; UI will still reflect success via subsequent reads
     }
 
     return signature;
@@ -156,7 +153,6 @@ class SolanaService {
     const program = this.getProgram();
     const [configPda] = this.findConfigPDA();
 
-    // Prefer wallet adapter send to avoid double-broadcast issues (e.g., Solflare)
     const builtTx = await program.methods
       .initializeConfig()
       .accounts({
@@ -169,7 +165,6 @@ class SolanaService {
     const sigViaWallet = await this.sendWithWalletIfAvailable(wallet, builtTx);
     if (sigViaWallet) return sigViaWallet;
 
-    // Fallback to Anchor RPC
     return await program.methods
       .initializeConfig()
       .accounts({
@@ -353,7 +348,6 @@ class SolanaService {
     const program = this.getProgram();
     
     try {
-      // Transfer capsule inputs logged silently
 
       const capsulePubkey = new PublicKey(capsuleAddress);
       const newOwnerPubkey = new PublicKey(newOwner);
@@ -363,11 +357,9 @@ class SolanaService {
         try {
           mintPubkey = new PublicKey(mintAddress);
         } catch (error) {
-          // Invalid mint address provided, using null instead
           mintPubkey = null;
         }
       } else {
-        // No mint address provided
       }
       
       const builtTx = await program.methods
@@ -392,8 +384,6 @@ class SolanaService {
               systemProgram: web3.SystemProgram.programId,
             })
             .rpc();
-
-      // Transfer transaction successful
 
       return {
         signature: tx,

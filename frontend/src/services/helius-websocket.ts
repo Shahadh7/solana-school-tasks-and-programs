@@ -42,9 +42,6 @@ class HeliusWebSocketService {
   private connection: Connection;
   private wsEndpoint: string;
   private isConnected: boolean = false;
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
-  private reconnectInterval: number = 3000;
   private eventListeners: Map<WebSocketEventType, Set<(event: WebSocketEvent) => void>> = new Map();
   
   private accountSubscriptions: Map<string, number> = new Map();
@@ -72,16 +69,10 @@ class HeliusWebSocketService {
     });
   }
 
-  /**
-   * Get the proper WebSocket endpoint for Helius
-   */
   private getWebSocketEndpoint(): string {
     return getWebSocketEndpoint();
   }
 
-  /**
-   * Initialize event listener infrastructure
-   */
   private initializeEventListeners(): void {
     const eventTypes: WebSocketEventType[] = [
       'account-change',
@@ -96,16 +87,10 @@ class HeliusWebSocketService {
     });
   }
 
-  /**
-   * Check if a method exists on the connection
-   */
   private hasMethod(methodName: string): boolean {
     return typeof ((this.connection as unknown) as Record<string, unknown>)[methodName] === 'function';
   }
 
-  /**
-   * Subscribe to account changes
-   */
   async subscribeToAccount(
     publicKey: PublicKey,
     callback: (accountInfo: AccountInfo<Buffer> | null, context: Context) => void,
@@ -141,9 +126,6 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Subscribe to transaction confirmations
-   */
   async subscribeToTransaction(
     signature: string,
     callback: (confirmation: unknown) => void,
@@ -188,9 +170,6 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Subscribe to program account changes
-   */
   async subscribeToProgramAccounts(
     programId: PublicKey,
     callback: (accountInfo: AccountInfo<Buffer> | null, context: Context) => void,
@@ -229,9 +208,6 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Subscribe to slot changes for real-time block updates
-   */
   async subscribeToSlotChanges(
     callback: (slotInfo: unknown) => void
   ): Promise<string> {
@@ -267,9 +243,6 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Unsubscribe from account changes
-   */
   async unsubscribeFromAccount(subscriptionKey: string): Promise<void> {
     const subscriptionId = this.accountSubscriptions.get(subscriptionKey);
     if (subscriptionId !== undefined) {
@@ -281,9 +254,6 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Fallback polling method for transaction confirmation
-   */
   private async pollTransactionStatus(
     signature: string,
     callback: (confirmation: unknown) => void,
@@ -340,9 +310,6 @@ class HeliusWebSocketService {
     poll();
   }
 
-  /**
-   * Unsubscribe from transaction confirmations
-   */
   async unsubscribeFromTransaction(subscriptionKey: string): Promise<void> {
     const subscriptionId = this.transactionSubscriptions.get(subscriptionKey);
     if (subscriptionId !== undefined) {
@@ -354,9 +321,6 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Unsubscribe from program account changes
-   */
   async unsubscribeFromProgramAccounts(subscriptionKey: string): Promise<void> {
     const subscriptionId = this.programSubscriptions.get(subscriptionKey);
     if (subscriptionId !== undefined) {
@@ -368,9 +332,7 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Add event listener for WebSocket events
-   */
+
   addEventListener(
     eventType: WebSocketEventType,
     listener: (event: WebSocketEvent) => void
@@ -381,9 +343,6 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Remove event listener
-   */
   removeEventListener(
     eventType: WebSocketEventType,
     listener: (event: WebSocketEvent) => void
@@ -394,9 +353,6 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Emit WebSocket event to all listeners
-   */
   private emitEvent(eventType: WebSocketEventType, data: unknown): void {
     const listeners = this.eventListeners.get(eventType);
     if (listeners) {
@@ -416,9 +372,6 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Get connection status
-   */
   getConnectionStatus(): {
     isConnected: boolean;
     endpoint: string;
@@ -445,9 +398,6 @@ class HeliusWebSocketService {
     };
   }
 
-  /**
-   * Test WebSocket connection
-   */
   async testConnection(): Promise<boolean> {
     try {
       const result = await this.connection.getLatestBlockhash();
@@ -460,9 +410,6 @@ class HeliusWebSocketService {
     }
   }
 
-  /**
-   * Initialize connection status check
-   */
   private async initializeConnectionCheck(): Promise<void> {
     await this.testConnection();
     
@@ -471,9 +418,6 @@ class HeliusWebSocketService {
     }, 30000); 
   }
 
-  /**
-   * Clean up all subscriptions
-   */
   async cleanup(): Promise<void> {
     console.log('🧹 Cleaning up WebSocket subscriptions...');
     

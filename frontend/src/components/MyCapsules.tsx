@@ -1498,7 +1498,7 @@ export function MyCapsules() {
                 </div>
                 <h2 className="text-3xl font-black text-white mb-3">Mint Capsule as NFT</h2>
                 <p className="text-lg text-gray-300 leading-relaxed">
-                  Choose the type of NFT to mint for your unlocked capsule
+                  Click Mint NFT to mint a compressed NFT (cNFT) for your unlocked capsule
                 </p>
               </div>
               <div className="space-y-6">

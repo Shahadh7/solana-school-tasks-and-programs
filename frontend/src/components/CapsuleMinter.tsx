@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Upload, Calendar, Loader2, CheckCircle, AlertCircle, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppStore } from '@/stores/appStore';
-
 import { WebSocketStatus } from '@/components/WebSocketStatus';
 import { ipfsService } from '@/services/ipfs';
 import { solanaService, CapsuleData } from '@/services/solana';
@@ -222,9 +221,7 @@ export function CapsuleMinter({ onCapsuleCreated }: CapsuleMinterProps) {
       );
 
       setMintingState({ status: 'success', progress: 100 });
-      void mintResult; // prevent unused var warning while preserving future-use semantics
-
-      // NFT minted successfully
+      void mintResult;
 
       setShowMintPrompt(false);
       setCreatedCapsule(null);

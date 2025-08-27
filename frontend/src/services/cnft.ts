@@ -76,9 +76,7 @@ export interface Wallet {
   signMessage: (message: Uint8Array) => Promise<Uint8Array>
 }
 
-/**
- * CNFTService - A comprehensive service for Metaplex Bubblegum v2 operations
- */
+
 class CNFTService {
   private umi: Umi
   private rpcEndpoint: string
@@ -95,9 +93,7 @@ class CNFTService {
     }
   }
 
-  /**
-   * Initialize the service with a connected wallet
-   */
+
   async initialize(wallet: Wallet): Promise<void> {
     try {
       const walletAdapter = walletAdapterIdentity({
@@ -114,9 +110,7 @@ class CNFTService {
     }
   }
 
-  /**
-   * Create a new Merkle tree for storing compressed NFTs
-   */
+
   async createTree(params?: {
     maxDepth?: number
     maxBufferSize?: number
@@ -166,9 +160,7 @@ class CNFTService {
     }
   }
 
-  /**
-   * Upload metadata to IPFS and return the URI
-   */
+
   private async uploadMetadataToIPFS(metadata: CNFTMetadata): Promise<string> {
     try {
       const { ipfsService } = await import('./ipfs')
@@ -184,9 +176,7 @@ class CNFTService {
     }
   }
 
-  /**
-   * Upload image to IPFS and return the URL
-   */
+
   private async uploadImageToIPFS(imageFile: File): Promise<string> {
     try {
       const { ipfsService } = await import('./ipfs')
@@ -198,9 +188,7 @@ class CNFTService {
     }
   }
 
-  /**
-   * Mint a compressed NFT to the specified tree
-   */
+
   async mintCNFT(
     params: MintCNFTParams,
     treeAddress?: UmiPublicKey,
@@ -319,10 +307,7 @@ class CNFTService {
     }
   }
 
-  /**
-   * Transfer a compressed NFT to another owner
-   * This implementation fetches asset data and merkle proofs from DAS API and constructs the transfer properly
-   */
+
   async transferCNFT(params: {
     assetId: string
     newOwner: string | UmiPublicKey
@@ -334,7 +319,7 @@ class CNFTService {
 
       console.log('🔄 Starting cNFT transfer with improved implementation...');
 
-      // Fetch asset data from DAS API
+
       const asset = await heliusDasService.getAsset(params.assetId);
       if (!asset) {
         throw new Error('Asset not found in DAS API');
@@ -350,7 +335,7 @@ class CNFTService {
         tree: asset.compression.tree
       });
 
-      // Verify ownership
+
       if (!asset.ownership) {
         throw new Error('Asset ownership information not available');
       }
@@ -360,7 +345,7 @@ class CNFTService {
         throw new Error(`Transfer denied: Asset owner is ${currentOwner}, but signer is ${this.umi.identity.publicKey.toString()}`);
       }
 
-      // Fetch merkle proof
+
       const proofData = await heliusDasService.getAssetProof(params.assetId);
       if (!proofData) {
         throw new Error('Failed to fetch merkle proof for asset transfer');
@@ -372,16 +357,16 @@ class CNFTService {
         leafIndex: asset.compression.leaf_id
       });
 
-      // Prepare transfer parameters
+
       const merkleTree = createPublicKey(asset.compression.tree);
       const leafIndex = asset.compression.leaf_id;
       const proof = proofData.proof.map(p => createPublicKey(p));
       
-      // Use the correct owner and delegate from the asset
+
       const leafOwner = createPublicKey(asset.ownership.owner);
       const leafDelegate = asset.ownership.delegate 
         ? createPublicKey(asset.ownership.delegate) 
-        : leafOwner; // If no delegate, use owner
+        : leafOwner;
 
       console.log('🔄 Creating transfer instruction with parameters:', {
         leafOwner: leafOwner.toString(),
@@ -392,7 +377,7 @@ class CNFTService {
         proofLength: proof.length
       });
 
-      // Create transfer instruction
+
       const transferTx = transfer(this.umi, {
         leafOwner,
         leafDelegate,
@@ -432,7 +417,7 @@ class CNFTService {
     } catch (error) {
       console.error('❌ cNFT transfer failed:', error);
       
-      // Enhanced error logging for debugging
+
       if (error instanceof Error) {
         console.error('Error details:', {
           message: error.message,
@@ -447,9 +432,7 @@ class CNFTService {
     }
   }
 
-  /**
-   * Fetch compressed NFTs owned by a wallet using Helius DAS API
-   */
+
   async fetchWalletCNFTs(ownerAddress: UmiPublicKey): Promise<DasApiAsset[]> {
     try {
 
@@ -463,9 +446,7 @@ class CNFTService {
     }
   }
 
-  /**
-   * Fetch a specific compressed NFT by asset ID using Helius DAS API
-   */
+
   async fetchCNFT(assetId: UmiPublicKey): Promise<DasApiAsset | null> {
     try {
 
@@ -477,9 +458,7 @@ class CNFTService {
     }
   }
 
-  /**
-   * Get information about a Merkle tree
-   */
+
   async getTreeInfo(treeAddress: UmiPublicKey): Promise<TreeInfo | null> {
     try {
       
@@ -496,23 +475,17 @@ class CNFTService {
     }
   }
 
-  /**
-   * Set the default tree address for minting operations
-   */
+
   setDefaultTree(treeAddress: UmiPublicKey): void {
     this.defaultTreeAddress = treeAddress
   }
 
-  /**
-   * Get the current default tree address
-   */
+
   getDefaultTree(): UmiPublicKey | undefined {
     return this.defaultTreeAddress
   }
 
-  /**
-   * Validate cNFT minting parameters
-   */
+
   validateMintParams(params: MintCNFTParams, isForUnlockedCapsule: boolean = false): { isValid: boolean; errors: string[] } {
     const errors: string[] = []
 
@@ -552,30 +525,22 @@ class CNFTService {
     }
   }
 
-  /**
-   * Get the current RPC endpoint
-   */
+
   getRpcEndpoint(): string {
     return this.rpcEndpoint
   }
 
-  /**
-   * Check if the service is properly initialized
-   */
+
   isInitialized(): boolean {
     return !!this.umi.identity
   }
 
-  /**
-   * Check if a capsule is ready to be unlocked based on its metadata
-   */
+
   isReadyToUnlock(asset: DasApiAsset): boolean {
     return heliusDasService.isReadyToUnlock(asset)
   }
 
-  /**
-   * Monitor a minting transaction with real-time WebSocket updates
-   */
+
   async monitorMintTransaction(
     signature: string,
     onUpdate: (status: MintTransactionStatus) => void

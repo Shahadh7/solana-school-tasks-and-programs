@@ -135,7 +135,6 @@ export class EncryptionService {
         decryptedUrl
       };
     } catch (error) {
-      // Failed to decrypt with original creator key for transferred capsule
       return null;
     }
   }
@@ -158,7 +157,6 @@ export class EncryptionService {
       
       return null;
     } catch (error) {
-      // Failed to extract IPFS hash from encrypted data
       return null;
     }
   }

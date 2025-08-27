@@ -27,7 +27,6 @@ export interface CapsuleMetadata {
 
 export type Wallet = {
   publicKey: PublicKey
-  // Use a generic signature compatible with CNFT wallet interface to avoid type mismatch
   signTransaction: <T>(transaction: T) => Promise<T>
   signMessage: (message: Uint8Array) => Promise<Uint8Array>
 }
@@ -54,9 +53,6 @@ class NFTService {
     this.connection = createOptimizedConnection()
   }
 
-  /**
-   * Prepare capsule metadata and upload to IPFS
-   */
   async prepareCapsuleMetadata(
     params: MintCapsuleParams,
     onProgress?: (step: string, progress: number) => void
@@ -96,9 +92,6 @@ class NFTService {
     }
   }
 
-  /**
-   * Mint a compressed NFT (cNFT) for a memory capsule using Metaplex Bubblegum v2
-   */
   async mintCapsule(
     wallet: Wallet,
     params: MintCapsuleParams,
@@ -117,9 +110,6 @@ class NFTService {
     }
   }
 
-  /**
-   * Mint a compressed NFT using Metaplex Bubblegum v2
-   */
   private async mintCompressedCapsule(
     wallet: Wallet,
     params: MintCapsuleParams,
@@ -193,9 +183,6 @@ class NFTService {
     }
   }
 
-  /**
-   * Mint a regular NFT (fallback method)
-   */
   private async mintRegularCapsule(
     wallet: Wallet,
     params: MintCapsuleParams,
@@ -233,9 +220,6 @@ class NFTService {
     }
   }
 
-  /**
-   * Get compressed NFTs owned by a wallet using DAS API
-   */
   async getWalletNFTs(walletAddress: PublicKey): Promise<CapsuleMetadata[]> {
     try {
       const { publicKey } = await import('@metaplex-foundation/umi')
@@ -263,7 +247,6 @@ class NFTService {
           }
         })
 
-      // Found cNFTs for wallet silently
       return capsules
     } catch (error) {
       console.error('Error fetching wallet cNFTs:', error)
@@ -271,9 +254,6 @@ class NFTService {
     }
   }
 
-  /**
-   * Transfer a memory capsule to another wallet
-   */
   async transferCapsule(
     _wallet: Wallet,
     _params: {
@@ -281,13 +261,9 @@ class NFTService {
       newOwner: PublicKey
     }
   ): Promise<string> {
-    // Not used in current flow; implemented via combined-transfer service
     throw new Error('Use combined-transfer service for capsule + cNFT transfer')
   }
 
-  /**
-   * Monitor transaction confirmation in real-time using WebSockets
-   */
   async monitorTransactionConfirmation(
     signature: string,
     onUpdate?: (status: 'pending' | 'confirmed' | 'failed', details?: Record<string, unknown>) => void
@@ -330,9 +306,6 @@ class NFTService {
     });
   }
 
-  /**
-   * Subscribe to wallet account changes for real-time balance updates
-   */
   async subscribeToWalletUpdates(
     walletPublicKey: PublicKey,
     onUpdate: (accountInfo: Record<string, unknown>) => void
@@ -356,30 +329,22 @@ class NFTService {
     }
   }
 
-  /**
-   * Unsubscribe from wallet updates
-   */
+
   async unsubscribeFromWalletUpdates(subscriptionKey: string): Promise<void> {
     await heliusWebSocket.unsubscribeFromAccount(subscriptionKey);
   }
 
-  /**
-   * Get WebSocket connection status
-   */
+
   getWebSocketStatus() {
     return heliusWebSocket.getConnectionStatus();
   }
 
-  /**
-   * Check if a capsule is ready to be unlocked based on its unlock date
-   */
+
   isReadyToUnlock(unlockDate: Date): boolean {
     return new Date() >= unlockDate
   }
 
-  /**
-   * Validate capsule parameters
-   */
+
   validateCapsuleParams(params: MintCapsuleParams): { isValid: boolean; errors: string[] } {
     const errors: string[] = []
 

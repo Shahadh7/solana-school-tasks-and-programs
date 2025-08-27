@@ -31,7 +31,6 @@ export function CapsuleUpdateModal({ capsule, isOpen, onClose, onUpdate }: Capsu
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Hooks must run unconditionally before any early returns
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
