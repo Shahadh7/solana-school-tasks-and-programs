@@ -86,7 +86,7 @@ function TransactionDisplay({ capsule }: { capsule: Capsule }) {
 
 export function MyCapsules() {
   const { connected, publicKey, signTransaction, signMessage } = useWallet();
-  const { userCapsules, setUserCapsules, updateCapsule } = useAppStore();
+  const { userCapsules, setUserCapsules, updateCapsule, removeCapsule } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [selectedCapsule, setSelectedCapsule] = useState<Capsule | null>(null);
   const [unlockingCapsule, setUnlockingCapsule] = useState<string | null>(null);
@@ -102,6 +102,7 @@ export function MyCapsules() {
   const [showNFTViewer, setShowNFTViewer] = useState<string | null>(null);
   const [showFullscreenImage, setShowFullscreenImage] = useState<string | null>(null);
   const [showUpdateModal, setShowUpdateModal] = useState<string | null>(null);
+  const [showCloseConfirmation, setShowCloseConfirmation] = useState<string | null>(null);
 
   
   // helper removed; base58 conversion not used in prod UI
@@ -521,6 +522,69 @@ export function MyCapsules() {
 
   const handleCloseCapsule = () => {
     setSelectedCapsule(null);
+  };
+
+  const handleCloseCapsuleOnChain = async (capsule: Capsule) => {
+    // Show confirmation dialog first
+    setShowCloseConfirmation(capsule.id);
+  };
+
+  const confirmCloseCapsule = async (capsule: Capsule) => {
+    if (!connected || !publicKey || !signTransaction) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
+
+    // Check if capsule is unlocked
+    if (capsule.isLocked) {
+      toast.error('Cannot close a locked capsule. Please unlock it first.');
+      return;
+    }
+
+    // Check if user is the owner
+    if (capsule.owner !== publicKey.toString()) {
+      toast.error('Only the capsule owner can close it');
+      return;
+    }
+
+    try {
+      toast.loading('Closing capsule...', { id: 'close-capsule' });
+      
+      const signature = await solanaService.closeCapsule(
+        {
+          publicKey,
+          signTransaction,
+          signMessage: signMessage!
+        },
+        capsule.id
+      );
+
+      toast.success('Capsule closed successfully!', { id: 'close-capsule' });
+      
+      // Remove the capsule from the store
+      removeCapsule(capsule.id);
+      
+      // Close the modal if it's open
+      if (selectedCapsule?.id === capsule.id) {
+        setSelectedCapsule(null);
+      }
+      
+      // Close the confirmation dialog
+      setShowCloseConfirmation(null);
+      
+      console.log('Capsule closed with signature:', signature);
+      
+    } catch (error) {
+      console.error('Error closing capsule:', error);
+      toast.error(
+        error instanceof Error 
+          ? `Failed to close capsule: ${error.message}` 
+          : 'Failed to close capsule',
+        { id: 'close-capsule' }
+      );
+      // Close the confirmation dialog on error
+      setShowCloseConfirmation(null);
+    }
   };
 
   const handleShareCapsule = (capsule: Capsule) => {
@@ -1203,6 +1267,14 @@ export function MyCapsules() {
                       </Button>
                     )}
 
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCloseCapsuleOnChain(capsule)}
+                      className="flex-1 min-w-[120px] bg-white/5 hover:bg-red-400/10 text-white hover:text-red-200 border-red-400/30 hover:border-red-400/60 transition-all duration-300 px-4 py-2.5 rounded-xl"
+                    >
+                      <span className="font-semibold">Close</span>
+                    </Button>
 
                   </>
                 )}
@@ -1392,7 +1464,14 @@ export function MyCapsules() {
                     </Button>
                   )}
 
-
+                  {!selectedCapsule.isLocked && (
+                    <Button
+                      onClick={() => handleCloseCapsuleOnChain(selectedCapsule)}
+                      className="flex-1 min-w-[160px] bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl py-3"
+                    >
+                      Close Capsule
+                    </Button>
+                  )}
 
                   <Button
                     variant="outline"
@@ -1834,6 +1913,50 @@ export function MyCapsules() {
               loadUserCapsules();
             }}
           />
+        );
+      })()}
+
+      {/* Close Capsule Confirmation Modal */}
+      {(() => {
+        if (!showCloseConfirmation) return null;
+        const capsule = userCapsules.find(c => c.id === showCloseConfirmation);
+        if (!capsule) return null;
+        
+        return (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+            <div className="bg-gradient-to-br from-black/40 via-black/20 to-red-950/20 rounded-3xl shadow-2xl max-w-md w-full border border-red-400/30 backdrop-blur-xl overflow-hidden">
+              <div className="p-8">
+                <div className="text-center mb-8">
+                  <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-red-500 to-red-600 rounded-3xl mb-6 shadow-2xl shadow-red-500/30">
+                    <Lock className="h-10 w-10 text-white" />
+                  </div>
+                  <h2 className="text-3xl font-black text-white mb-3">Close Capsule</h2>
+                  <p className="text-lg text-gray-300 leading-relaxed">
+                    Are you sure you want to close <strong className="text-white">{capsule.name}</strong>?
+                  </p>
+                  <p className="text-sm text-red-400 mt-3">
+                    This action cannot be undone. The capsule will be permanently closed and removed from the blockchain.
+                  </p>
+                </div>
+                
+                <div className="flex gap-4">
+                  <Button
+                    onClick={() => confirmCloseCapsule(capsule)}
+                    className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 py-3 rounded-xl font-semibold"
+                  >
+                    Yes, Close Capsule
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCloseConfirmation(null)}
+                    className="flex-1 bg-white/5 hover:bg-gray-400/10 border-gray-400/30 hover:border-gray-400/60 text-white hover:text-gray-200 transition-all duration-300 py-3 rounded-xl font-semibold"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         );
       })()}
 
