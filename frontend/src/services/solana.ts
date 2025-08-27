@@ -79,7 +79,7 @@ class SolanaService {
 
   constructor() {
     this.connection = createOptimizedConnection();
-    this.programId = new PublicKey(process.env.NEXT_PUBLIC_PROGRAM_ID || '4UHykQD4g6ANrhZXYnKtECq9dq4HxV3JbFCkkRE4krX5');
+    this.programId = new PublicKey(process.env.NEXT_PUBLIC_PROGRAM_ID || '88fRjJ3XvAHH1N6468YQd6xuSiPXUX2kyTeD4d3Yz8ng');
     this.provider = {} as AnchorProvider;
   }
 

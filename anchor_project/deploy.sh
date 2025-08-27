@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Default values
 NETWORK="devnet"
-PROGRAM_ID="5BY4zzPL5qWSwDeArRD82YpSY1utsJGBsgNisTPpuHTm"
+PROGRAM_ID="88fRjJ3XvAHH1N6468YQd6xuSiPXUX2kyTeD4d3Yz8ng"
 
 # Function to print colored output
 print_status() {
@@ -159,7 +159,7 @@ if [ "$DEPLOYED_PROGRAM_ID" != "$PROGRAM_ID" ]; then
     print_status "Updating Anchor.toml..."
     
     # Update the program ID in Anchor.toml
-    sed -i "s/5BY4zzPL5qWSwDeArRD82YpSY1utsJGBsgNisTPpuHTm/$DEPLOYED_PROGRAM_ID/g" Anchor.toml
+    sed -i "s/88fRjJ3XvAHH1N6468YQd6xuSiPXUX2kyTeD4d3Yz8ng/$DEPLOYED_PROGRAM_ID/g" Anchor.toml
     
     print_success "Anchor.toml updated with new program ID"
 fi

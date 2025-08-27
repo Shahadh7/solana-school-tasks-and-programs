@@ -8,7 +8,7 @@ pub mod state;
 pub mod errors;
 pub mod events;
 
-declare_id!("4UHykQD4g6ANrhZXYnKtECq9dq4HxV3JbFCkkRE4krX5");
+declare_id!("88fRjJ3XvAHH1N6468YQd6xuSiPXUX2kyTeD4d3Yz8ng");
 
 #[program]
 pub mod dear_future {

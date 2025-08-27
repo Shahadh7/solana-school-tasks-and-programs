@@ -31,7 +31,7 @@ async function main() {
   anchor.setProvider(provider);
   
   // Load the program from the deployed IDL
-  const programId = new PublicKey("4UHykQD4g6ANrhZXYnKtECq9dq4HxV3JbFCkkRE4krX5");
+  const programId = new PublicKey("88fRjJ3XvAHH1N6468YQd6xuSiPXUX2kyTeD4d3Yz8ng");
   
   // Load the IDL
   const idlPath = path.join(__dirname, "..", "target", "idl", "dear_future.json");

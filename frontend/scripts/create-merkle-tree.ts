@@ -11,7 +11,7 @@ import * as path from 'path'
 import { fileURLToPath } from 'url'
 
 
-const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_URL || 'https:
+const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_URL || 'https://api.devnet.solana.com'
 const TREE_CONFIG = {
   maxDepth: 14,        
   maxBufferSize: 64,   
@@ -94,33 +94,22 @@ async function createMerkleTree() {
 }
 
 async function loadOrCreateAdminKeypair() {
-  const keypairPath = path.join(__dirname, 'admin-keypair.json')
+  // Use the same keypair that was used to deploy the program
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  const keypairPath = path.join(homeDir!, '.config', 'solana', 'id.json');
   
   try {
-    if (fs.existsSync(keypairPath)) {
-      console.log('Loading existing admin keypair...')
-      const keypairData = JSON.parse(fs.readFileSync(keypairPath, 'utf8'))
-      const umi = createUmi(RPC_ENDPOINT)
-      const keypair = umi.eddsa.createKeypairFromSecretKey(new Uint8Array(keypairData))
-      return createSignerFromKeypair(umi, keypair)
-    }
+    console.log('Loading existing Solana wallet keypair...')
+    const keypairData = JSON.parse(fs.readFileSync(keypairPath, 'utf8'))
+    const umi = createUmi(RPC_ENDPOINT)
+    const keypair = umi.eddsa.createKeypairFromSecretKey(new Uint8Array(keypairData))
+    console.log('✅ Loaded wallet keypair:', keypair.publicKey.toString())
+    return createSignerFromKeypair(umi, keypair)
   } catch (error) {
-    console.log('Could not load existing keypair, creating new one...')
+    console.error('❌ Failed to load wallet keypair from:', keypairPath)
+    console.error('Error:', error)
+    process.exit(1)
   }
-
-  
-  console.log('Generating new admin keypair...')
-  const umi = createUmi(RPC_ENDPOINT)
-  const keypair = generateSigner(umi)
-  
-  
-  fs.writeFileSync(keypairPath, JSON.stringify(Array.from(keypair.secretKey)))
-  console.log('✅ Admin keypair saved to:', keypairPath)
-  console.log('⚠️  IMPORTANT: Fund this wallet with SOL before creating the tree!')
-  console.log('   Wallet address:', keypair.publicKey.toString())
-  console.log('   Required: ~0.1 SOL for tree creation')
-  
-  return keypair
 }
 
 async function saveTreeConfig(config: any) {
@@ -133,7 +122,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 
-if (import.meta.url === `file:
+if (import.meta.url === `file://${process.argv[1]}`) {
   createMerkleTree()
     .then(() => {
       console.log('Script completed successfully!')
