@@ -160,7 +160,7 @@ After deployment, update your environment variables:
 ```bash
 # Program Configuration
 NEXT_PUBLIC_PROGRAM_ID=88fRjJ3XvAHH1N6468YQd6xuSiPXUX2kyTeD4d3Yz8ng
-NEXT_PUBLIC_SOLANA_NETWORK=devnet
+NEXT_PUBLIC_NETWORK=devnet
 
 # Merkle Tree Configuration
 NEXT_PUBLIC_MERKLE_TREE_ADDRESS=DcwsMGM6gqTPFuVSKQnNjoMCSNyTyy6ML4GdTEqCfkr7
