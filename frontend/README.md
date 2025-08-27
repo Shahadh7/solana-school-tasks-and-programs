@@ -1,12 +1,12 @@
 # Dear Future - Solana Memory Capsule dApp
 
-[![Deployed Frontend](https://img.shields.io/badge/Frontend-Deployed-brightgreen)](https://your-frontend-url.com)
+[![Deployed Frontend](https://img.shields.io/badge/Frontend-Deployed-brightgreen)](https://dearfuture.xyz/)
 
 A decentralized time-locked memory capsule application built on Solana blockchain. Create encrypted memory capsules with future unlock dates, transfer them to others, and unlock them when the time comes. Features compressed NFTs (cNFTs), IPFS integration, and advanced encryption.
 
 ## 🚀 Live Demo
 
-**Frontend Application:** [https://your-frontend-url.com](https://your-frontend-url.com)
+**Frontend Application:** [https://dearfuture.xyz/](https://dearfuture.xyz/)
 
 
 ## ✨ Features
