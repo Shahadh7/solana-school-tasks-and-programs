@@ -169,32 +169,53 @@ NEXT_PUBLIC_MERKLE_TREE_ADDRESS=DcwsMGM6gqTPFuVSKQnNjoMCSNyTyy6ML4GdTEqCfkr7
 ## Testing
 
 ### Test Coverage
-Comprehensive test suite covering all instructions with both successful operations and error conditions to ensure program security and reliability.
+Comprehensive test suite covering all instructions with both successful operations and error conditions to ensure program security and reliability. The test suite goes beyond basic functionality to include extensive edge cases, security testing, and advanced scenarios.
 
 **Happy Path Tests:**
 - **Initialize Config**: Successfully creates program configuration
-- **Create Capsule**: Properly creates new memory capsules
-- **Transfer Capsule**: Successfully transfers ownership
+- **Create Capsule**: Properly creates new memory capsules with and without encrypted URLs
+- **Transfer Capsule**: Successfully transfers ownership with and without mint addresses
 - **Unlock Capsule**: Allows access when time permits
-- **Update Capsule**: Modifies metadata correctly
+- **Update Capsule**: Modifies metadata correctly (content, URLs, unlock dates)
 - **Close Capsule**: Removes capsules and recovers rent
+- **Multiple Transfer Chain Tests**: Complex ownership transfer scenarios through multiple users
+- **Data Preservation Tests**: Ensures all capsule data is maintained during transfers
+- **Input Boundary Testing**: Tests exact maximum lengths for titles, content, and URLs
+- **Mint Address Handling**: Tests mint address assignment during transfers
+- **Mint Creator Tracking**: Validates mint creator information preservation
+- **NFT Transfer Scenarios**: Tests various NFT transfer configurations
+- **String Length Validation**: Tests title (100 chars), content (300 chars), URL (500 chars) limits
+- **Date Validation**: Tests past date rejection and future date acceptance
+- **State Transition Validation**: Ensures proper capsule state changes
+- **Account Lifecycle Testing**: Complete capsule creation to closure workflow
 
 **Unhappy Path Tests:**
 - **Unauthorized Operations**: Fails when non-owners try to modify capsules
-- **Time Restrictions**: Prevents unlocking before due date
+- **Time Restrictions**: Prevents unlocking before due date and invalid date extensions
 - **Invalid States**: Handles edge cases and invalid operations
-- **Account Validation**: Ensures proper account structure
+- **Account Validation**: Ensures proper account structure and PDA derivation
+- **Input Validation**: Tests boundary conditions for strings and data lengths
+- **Empty Input Handling**: Validates behavior with empty strings and null values
+- **Concurrent Operations**: Tests race conditions and concurrent capsule updates
+- **PDA Security**: Validates proper PDA derivation and prevents invalid account access
+- **Mint Integration Security**: Tests NFT mint address handling and security
+- **Owner vs Creator Rights**: Comprehensive testing of ownership vs creation permissions
+- **Transfer Security**: Validates transfer operations and prevents self-transfers
+- **Post-Transfer Permissions**: Ensures new owners have proper access rights
+- **Permission Validation**: Tests all access control scenarios
 
 ### Running Tests
 ```bash
 cd anchor_project
 yarn install    # install dependencies
-anchor test     # run tests
+anchor test     # run all tests
+anchor test --skip-local-validator  # run tests with external validator
 ```
 
 ### Test Files
-- `tests/dear_future_capsule.ts` - Core functionality tests
-- `tests/dear_future_edge_cases.ts` - Edge case and error handling tests
+- `tests/dear_future_capsule.ts` - Core functionality tests covering all program instructions, access control, ownership management, and basic error handling
+- `tests/dear_future_edge_cases.ts` - Advanced edge case testing, security validation, concurrency testing, and NFT integration scenarios
+
 
 ## Merkle Tree Integration
 

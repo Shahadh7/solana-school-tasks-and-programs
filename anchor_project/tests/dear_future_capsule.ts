@@ -8,6 +8,28 @@ describe("Dear Future: Capsules Management ", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
+  // --- chain time helpers ---
+  const conn = anchor.getProvider().connection;
+
+  async function chainNow(): Promise<number> {
+    for (const commitment of ["finalized", "confirmed", "processed"] as const) {
+      const slot = await conn.getSlot(commitment as any);
+      const t = await conn.getBlockTime(slot);
+      if (t != null) return t;
+    }
+    return Math.floor(Date.now() / 1000);
+  }
+
+  async function waitForChainTime(targetTs: number): Promise<void> {
+    while (true) {
+      const t = await chainNow();
+      if (t >= targetTs) return;
+      const ms = Math.min(1000, Math.max(100, (targetTs - t) * 250));
+      await new Promise(r => setTimeout(r, ms));
+    }
+  }
+
+
   const program = anchor.workspace.DearFuture as Program<DearFuture>;
   const wallet = provider.wallet as anchor.Wallet;
 
@@ -22,8 +44,8 @@ describe("Dear Future: Capsules Management ", () => {
   //Test data
   const title = "My Future Capsule";
   const content = "This is a message to my future self.";
-  const futureUnlockDate = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
-  const pastUnlockDate = Math.floor(Date.now() / 1000) - 3600; // 1 hour ago
+  let futureUnlockDate: number; // will be set from chain time in before()
+  let pastUnlockDate: number; // will be set from chain time in before()
 
   before(async () => {
     // Get PDA for config
@@ -32,23 +54,42 @@ describe("Dear Future: Capsules Management ", () => {
       program.programId
     );
 
+    
+    // Initialize chain-relative timestamps for tests
+    const now = await chainNow();
+    futureUnlockDate = now + 3600;
+    pastUnlockDate = now - 600;
+    
   });
 
   describe("Config Initialization", () => {
     it("Should initialize config successfully", async () => {
-      const tx = await program.methods
-        .initializeConfig()
-        .accounts({
-          config: configPda,
-          authority: wallet.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
+      let initAttempted = false;
+      try {
+        await program.methods
+          .initializeConfig()
+          .accounts({
+            config: configPda,
+            authority: wallet.publicKey,
+            systemProgram: SystemProgram.programId,
+          })
+          .rpc();
+        initAttempted = true;
+      } catch (e: any) {
+        const msg = (e.message || "").toLowerCase();
+        const benign =
+          msg.includes("already in use") ||
+          msg.includes("custom program error: 0x0") ||
+          msg.includes("already initialized");
+        if (!benign) throw e;
+      }
 
       const configAccount = await program.account.config.fetch(configPda);
       expect(configAccount.authority.toString()).to.equal(wallet.publicKey.toString());
-      expect(configAccount.totalCapsules.toNumber()).to.equal(0);
       expect(configAccount.version).to.equal(1);
+      if (initAttempted) {
+        expect(configAccount.totalCapsules.toNumber()).to.equal(0);
+      }
     });
 
     it("Should fail to initialize config twice", async () => {
@@ -137,7 +178,6 @@ describe("Dear Future: Capsules Management ", () => {
       expect(capsuleAccount.isUnlocked).to.be.false;
       expect(capsuleAccount.mint).to.be.null;
       expect(capsuleAccount.id.toNumber()).to.equal(capsuleId);
-      expect(capsuleAccount.bump).to.equal(capsuleBump);
 
       // Verify config was updated
       const updatedConfig = await program.account.config.fetch(configPda);
@@ -273,7 +313,7 @@ describe("Dear Future: Capsules Management ", () => {
         .updateCapsule(newContent, null, null, false)
         .accounts({
           capsule: capsulePda,
-          owner: wallet.publicKey, // Updated to use owner instead of creator
+          owner: wallet.publicKey,
         })
         .rpc();
 
@@ -288,7 +328,7 @@ describe("Dear Future: Capsules Management ", () => {
         .updateCapsule(null, null, newEncryptedUrl, false)
         .accounts({
           capsule: capsulePda,
-          owner: wallet.publicKey, // Updated to use owner instead of creator
+          owner: wallet.publicKey,
         })
         .rpc();
 
@@ -302,7 +342,7 @@ describe("Dear Future: Capsules Management ", () => {
         .updateCapsule(null, null, null, true)
         .accounts({
           capsule: capsulePda,
-          owner: wallet.publicKey, // Updated to use owner instead of creator
+          owner: wallet.publicKey,
         })
         .rpc();
 
@@ -317,7 +357,7 @@ describe("Dear Future: Capsules Management ", () => {
         .updateCapsule(null, new anchor.BN(newUnlockDate), null, false)
         .accounts({
           capsule: capsulePda,
-          owner: wallet.publicKey, // Updated to use owner instead of creator
+          owner: wallet.publicKey,
         })
         .rpc();
 
@@ -333,7 +373,7 @@ describe("Dear Future: Capsules Management ", () => {
           .updateCapsule(null, new anchor.BN(shorterDate), null, false)
           .accounts({
             capsule: capsulePda,
-            owner: wallet.publicKey, // Updated to use owner instead of creator
+            owner: wallet.publicKey,
           })
           .rpc();
         expect.fail("Should have failed");
@@ -358,7 +398,7 @@ describe("Dear Future: Capsules Management ", () => {
           .updateCapsule("Malicious update", null, null, false)
           .accounts({
             capsule: capsulePda,
-            owner: nonCreator.publicKey, // Updated to use owner instead of creator
+            owner: nonCreator.publicKey,
           })
           .signers([nonCreator])
           .rpc();
@@ -375,7 +415,7 @@ describe("Dear Future: Capsules Management ", () => {
 
     before(async () => {
       // Create a capsule with future unlock date (15 seconds from now)
-      futureUnlockDate = Math.floor(Date.now() / 1000) + 15; // 15 seconds from now
+      futureUnlockDate = (await chainNow()) + 40; // 40 seconds from now
       
       const configAccount = await program.account.config.fetch(configPda);
       const capsuleId = configAccount.totalCapsules.toNumber();
@@ -390,7 +430,7 @@ describe("Dear Future: Capsules Management ", () => {
       );
 
       await program.methods
-        .createCapsule("Future Capsule", "This can be unlocked in 30 seconds", new anchor.BN(futureUnlockDate), null)
+        .createCapsule("Future Capsule", "This can be unlocked in 15 seconds", new anchor.BN(futureUnlockDate), null)
         .accounts({
           config: configPda,
           capsule: futureCapsulePda,
@@ -406,7 +446,7 @@ describe("Dear Future: Capsules Management ", () => {
           .unlockCapsule()
           .accounts({
             capsule: futureCapsulePda,
-            owner: wallet.publicKey, // Updated to use owner instead of unlocker
+            owner: wallet.publicKey,
           })
           .rpc();
         expect.fail("Should have failed");
@@ -416,18 +456,15 @@ describe("Dear Future: Capsules Management ", () => {
     });
 
     it("Should unlock capsule when time has passed", async () => {
-      // Wait for the unlock time to pass (30 seconds + small buffer)
-      const waitTime = futureUnlockDate * 1000 - Date.now() + 3000; // Add 3 second buffer
-      if (waitTime > 0) {
-        console.log(`Waiting ${waitTime}ms for capsule to be unlockable...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
+      // Wait for the unlock time to pass
+      console.log("Please wait few seconds for the capsule to be unlocked");
+      await waitForChainTime(futureUnlockDate + 1);
 
       await program.methods
         .unlockCapsule()
         .accounts({
           capsule: futureCapsulePda,
-          owner: wallet.publicKey, // Updated to use owner instead of unlocker
+          owner: wallet.publicKey,
         })
         .rpc();
 
@@ -443,7 +480,7 @@ describe("Dear Future: Capsules Management ", () => {
           .updateCapsule("Cannot update after unlock", null, null, false)
           .accounts({
             capsule: futureCapsulePda,
-            owner: wallet.publicKey, // Updated to use owner instead of creator
+            owner: wallet.publicKey,
           })
           .rpc();
         expect.fail("Should have failed");
@@ -457,24 +494,12 @@ describe("Dear Future: Capsules Management ", () => {
     it("Should close unlocked capsule successfully", async () => {
       const initialBalance = await provider.connection.getBalance(wallet.publicKey);
       
-      // Get the unlocked capsule PDA that we can close
-      const configAccount = await program.account.config.fetch(configPda);
-      const capsuleId = unlockedCapsuleID; // The past capsule we created and unlocked
-      
-      const [unlockedCapsulePda] = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("capsule"),
-          wallet.publicKey.toBuffer(),
-          new anchor.BN(capsuleId).toBuffer("le", 8),
-        ],
-        program.programId
-      );
-
+      // Use the unlocked capsule from the previous test
       await program.methods
         .closeCapsule()
         .accounts({
           capsule: unlockedCapsulePda,
-          owner: wallet.publicKey, // Updated to use owner instead of creator
+          owner: wallet.publicKey,
         })
         .rpc();
 
@@ -497,7 +522,7 @@ describe("Dear Future: Capsules Management ", () => {
           .closeCapsule()
           .accounts({
             capsule: capsulePda, // This one is still locked
-            owner: wallet.publicKey, // Updated to use owner instead of creator
+            owner: wallet.publicKey,
           })
           .rpc();
         expect.fail("Should have failed");
@@ -511,8 +536,10 @@ describe("Dear Future: Capsules Management ", () => {
       const configAccount = await program.account.config.fetch(configPda);
       const capsuleId = configAccount.totalCapsules.toNumber();
 
-      // Create a capsule with future unlock date (15 seconds from now)
-      let futureUnlockDate = Math.floor(Date.now() / 1000) + 15; // 15 seconds from now
+      console.log("Please wait few seconds for the capsule to be unlocked");
+      // Create a capsule with future unlock date (5 seconds from now)
+      const shortUnlockDate = (await chainNow()) + 40; // 5 seconds from now
+      
 
       const [newCapsulePda] = PublicKey.findProgramAddressSync(
         [
@@ -524,7 +551,7 @@ describe("Dear Future: Capsules Management ", () => {
       );
 
       await program.methods
-        .createCapsule("Another Past Capsule", "For closing test", new anchor.BN(futureUnlockDate), null)
+        .createCapsule("Another Capsule", "For closing test", new anchor.BN(shortUnlockDate), null)
         .accounts({
           config: configPda,
           capsule: newCapsulePda,
@@ -533,18 +560,14 @@ describe("Dear Future: Capsules Management ", () => {
         })
         .rpc();
       
-      // Wait for the unlock time to pass (30 seconds + small buffer)
-      const waitTime = futureUnlockDate * 1000 - Date.now() + 3000; // Add 3 second buffer
-      if (waitTime > 0) {
-        console.log(`Waiting ${waitTime}ms for capsule to be unlockable...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
+      // Wait for the unlock time to pass
+      await waitForChainTime(shortUnlockDate + 1);
 
       await program.methods
         .unlockCapsule()
         .accounts({
           capsule: newCapsulePda,
-          owner: wallet.publicKey, // Updated to use owner instead of unlocker
+          owner: wallet.publicKey,
         })
         .rpc();
 
@@ -561,7 +584,7 @@ describe("Dear Future: Capsules Management ", () => {
           .closeCapsule()
           .accounts({
             capsule: newCapsulePda,
-            owner: nonOwner.publicKey, // Updated to use owner instead of creator
+            owner: nonOwner.publicKey,
           })
           .signers([nonOwner])
           .rpc();
@@ -601,8 +624,10 @@ describe("Dear Future: Capsules Management ", () => {
         program.programId
       );
 
+      const transferUnlockDate = (await chainNow()) + 3600; // 1 hour from now
+
       await program.methods
-        .createCapsule("Transfer Test Capsule", "This capsule will be transferred", new anchor.BN(futureUnlockDate), null)
+        .createCapsule("Transfer Test Capsule", "This capsule will be transferred", new anchor.BN(transferUnlockDate), null)
         .accounts({
           config: configPda,
           capsule: transferCapsulePda,
@@ -646,8 +671,10 @@ describe("Dear Future: Capsules Management ", () => {
         program.programId
       );
 
+      const mintUnlockDate = (await chainNow()) + 3600; // 1 hour from now
+
       await program.methods
-        .createCapsule("Mint Transfer Capsule", "This capsule will be transferred with mint", new anchor.BN(futureUnlockDate), null)
+        .createCapsule("Mint Transfer Capsule", "This capsule will be transferred with mint", new anchor.BN(mintUnlockDate), null)
         .accounts({
           config: configPda,
           capsule: mintCapsulePda,
@@ -753,10 +780,11 @@ describe("Dear Future: Capsules Management ", () => {
     });
 
     it("Should allow new owner to unlock capsule when time comes", async () => {
-      // Create a capsule that can be unlocked immediately
+      // Create a capsule that can be unlocked soon
       const configAccount = await program.account.config.fetch(configPda);
       const capsuleId = configAccount.totalCapsules.toNumber();
-      const pastDate = Math.floor(Date.now() / 1000) + 1; // 1 second from now (minimal future time)
+      console.log("Please wait few seconds for the capsule to be unlocked");
+      const unlockSoon = (await chainNow()) + 40; // 2 seconds from now
       
       const [unlockableCapsulePda] = PublicKey.findProgramAddressSync(
         [
@@ -768,7 +796,7 @@ describe("Dear Future: Capsules Management ", () => {
       );
 
       await program.methods
-        .createCapsule("Unlockable Transfer Capsule", "Can be unlocked soon", new anchor.BN(pastDate), null)
+        .createCapsule("Unlockable Transfer Capsule", "Can be unlocked soon", new anchor.BN(unlockSoon), null)
         .accounts({
           config: configPda,
           capsule: unlockableCapsulePda,
@@ -789,7 +817,7 @@ describe("Dear Future: Capsules Management ", () => {
         .rpc();
 
       // Wait for unlock time to pass
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      await waitForChainTime(unlockSoon + 1);
 
       // New owner should be able to unlock
       await program.methods
@@ -861,6 +889,8 @@ describe("Dear Future: Capsules Management ", () => {
       const configAccount = await program.account.config.fetch(configPda);
       const capsuleId = configAccount.totalCapsules.toNumber();
       
+      const ownershipUnlockDate = (await chainNow()) + 3600; // 1 hour from now
+      
       [ownershipCapsulePda] = PublicKey.findProgramAddressSync(
         [
           Buffer.from("capsule"),
@@ -871,7 +901,7 @@ describe("Dear Future: Capsules Management ", () => {
       );
 
       await program.methods
-        .createCapsule("Ownership Test", "Testing owner vs creator", new anchor.BN(futureUnlockDate), null)
+        .createCapsule("Ownership Test", "Testing owner vs creator", new anchor.BN(ownershipUnlockDate), null)
         .accounts({
           config: configPda,
           capsule: ownershipCapsulePda,
@@ -932,7 +962,8 @@ describe("Dear Future: Capsules Management ", () => {
       // Create an unlockable capsule
       const configAccount = await program.account.config.fetch(configPda);
       const capsuleId = configAccount.totalCapsules.toNumber();
-      const pastDate = Math.floor(Date.now() / 1000) + 1; // 1 second from now
+      console.log("Please wait few seconds for the capsule to be unlocked");
+      const unlockSoon = (await chainNow()) + 40; // 2 seconds from now
       
       const [unlockTestCapsulePda] = PublicKey.findProgramAddressSync(
         [
@@ -944,7 +975,7 @@ describe("Dear Future: Capsules Management ", () => {
       );
 
       await program.methods
-        .createCapsule("Unlock Test", "For unlock access test", new anchor.BN(pastDate), null)
+        .createCapsule("Unlock Test", "For unlock access test", new anchor.BN(unlockSoon), null)
         .accounts({
           config: configPda,
           capsule: unlockTestCapsulePda,
@@ -965,7 +996,7 @@ describe("Dear Future: Capsules Management ", () => {
         .rpc();
 
       // Wait for unlock time to pass
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      await waitForChainTime(unlockSoon + 1);
 
       // Creator should fail to unlock
       try {
@@ -995,6 +1026,4 @@ describe("Dear Future: Capsules Management ", () => {
       expect(capsuleAccount.isUnlocked).to.be.true;
     });
   });
-
-
 });

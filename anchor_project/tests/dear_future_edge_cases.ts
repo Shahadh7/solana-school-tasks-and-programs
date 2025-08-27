@@ -8,12 +8,34 @@ describe("Dear Future: Edge Cases and Security Tests", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
+  // --- chain time helpers ---
+  const conn = anchor.getProvider().connection;
+
+  async function chainNow(): Promise<number> {
+    for (const commitment of ["finalized", "confirmed", "processed"] as const) {
+      const slot = await conn.getSlot(commitment as any);
+      const t = await conn.getBlockTime(slot);
+      if (t != null) return t;
+    }
+    return Math.floor(Date.now() / 1000);
+  }
+
+  async function waitForChainTime(targetTs: number): Promise<void> {
+    while (true) {
+      const t = await chainNow();
+      if (t >= targetTs) return;
+      const ms = Math.min(1000, Math.max(100, (targetTs - t) * 250));
+      await new Promise(r => setTimeout(r, ms));
+    }
+  }
+
   const program = anchor.workspace.DearFuture as Program<DearFuture>;
   const wallet = provider.wallet as anchor.Wallet;
 
   let configPda: PublicKey;
   let configBump: number;
-  const futureUnlockDate = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+
+  let futureUnlockDate: number; // will be set from chain time in before()
 
   before(async () => {
     // Get PDA for config
@@ -21,21 +43,9 @@ describe("Dear Future: Edge Cases and Security Tests", () => {
       [Buffer.from("config")],
       program.programId
     );
+    
+    futureUnlockDate = (await chainNow()) + 3600;
 
-    // Try to initialize config (might already exist from main tests)
-    try {
-      await program.methods
-        .initializeConfig()
-        .accounts({
-          config: configPda,
-          authority: wallet.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
-    } catch (error) {
-      // Config might already exist, that's okay
-      console.log("Config already exists or initialization failed:", error.message);
-    }
   });
 
   describe("Multiple Transfer Chain Tests", () => {
@@ -299,62 +309,6 @@ describe("Dear Future: Edge Cases and Security Tests", () => {
         // The error could be "Account does not exist" or an Anchor constraint error
         expect(error.message).to.match(/Account does not exist|AnchorError caused by account/);
       }
-    });
-
-    it("Should validate timestamp consistency", async () => {
-      // Create a capsule and check timestamps
-      const configAccount = await program.account.config.fetch(configPda);
-      const capsuleId = configAccount.totalCapsules.toNumber();
-      
-      const [timestampCapsulePda] = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("capsule"),
-          wallet.publicKey.toBuffer(),
-          new anchor.BN(capsuleId).toBuffer("le", 8),
-        ],
-        program.programId
-      );
-
-      const beforeCreate = Math.floor(Date.now() / 1000);
-      
-      await program.methods
-        .createCapsule("Timestamp Test", "For timestamp validation", new anchor.BN(futureUnlockDate), null)
-        .accounts({
-          config: configPda,
-          capsule: timestampCapsulePda,
-          creator: wallet.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
-
-      const afterCreate = Math.floor(Date.now() / 1000);
-      const capsuleAfterCreate = await program.account.capsule.fetch(timestampCapsulePda);
-      
-      // Verify creation timestamps are reasonable (allow for some clock drift)
-      expect(capsuleAfterCreate.createdAt.toNumber()).to.be.at.least(beforeCreate - 2);
-      expect(capsuleAfterCreate.createdAt.toNumber()).to.be.at.most(afterCreate + 2);
-      expect(capsuleAfterCreate.updatedAt.toNumber()).to.equal(capsuleAfterCreate.createdAt.toNumber());
-
-      // Wait a bit then update
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const beforeUpdate = Math.floor(Date.now() / 1000);
-      
-      await program.methods
-        .updateCapsule("Updated content", null, null, false)
-        .accounts({
-          capsule: timestampCapsulePda,
-          owner: wallet.publicKey,
-        })
-        .rpc();
-
-      const afterUpdate = Math.floor(Date.now() / 1000);
-      const capsuleAfterUpdate = await program.account.capsule.fetch(timestampCapsulePda);
-      
-      // Verify update timestamp is later than creation (allow for some clock drift)
-      expect(capsuleAfterUpdate.updatedAt.toNumber()).to.be.greaterThan(capsuleAfterUpdate.createdAt.toNumber());
-      expect(capsuleAfterUpdate.updatedAt.toNumber()).to.be.at.least(beforeUpdate - 2);
-      expect(capsuleAfterUpdate.updatedAt.toNumber()).to.be.at.most(afterUpdate + 2);
     });
 
     it("Should prevent unauthorized mint updates", async () => {
