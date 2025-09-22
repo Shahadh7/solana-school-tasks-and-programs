@@ -46,7 +46,7 @@ A decentralized time-locked memory capsule application built on Solana.
 - Program ID: `88fRjJ3XvAHH1N6468YQd6xuSiPXUX2kyTeD4d3Yz8ng`
 - Merkle Tree Account: `DcwsMGM6gqTPFuVSKQnNjoMCSNyTyy6ML4GdTEqCfkr7`
 
-## Technologies Used
+**Technologies Used:**
 - Solana Blockchain
 - Rust Programming Language
 - Anchor Framework
