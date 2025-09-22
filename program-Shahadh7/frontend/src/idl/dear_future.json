@@ -1,0 +1,784 @@
+{
+  "address": "88fRjJ3XvAHH1N6468YQd6xuSiPXUX2kyTeD4d3Yz8ng",
+  "metadata": {
+    "name": "dear_future",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Time-locked memory capsules with pNFT integration"
+  },
+  "instructions": [
+    {
+      "name": "close_capsule",
+      "discriminator": [
+        16,
+        246,
+        167,
+        171,
+        45,
+        72,
+        171,
+        122
+      ],
+      "accounts": [
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "capsule.creator",
+                "account": "Capsule"
+              },
+              {
+                "kind": "account",
+                "path": "capsule.id",
+                "account": "Capsule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_capsule",
+      "discriminator": [
+        195,
+        104,
+        42,
+        180,
+        127,
+        169,
+        62,
+        3
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "account",
+                "path": "config.total_capsules",
+                "account": "Config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "content",
+          "type": "string"
+        },
+        {
+          "name": "unlock_date",
+          "type": "i64"
+        },
+        {
+          "name": "encrypted_url",
+          "type": {
+            "option": "string"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer_capsule",
+      "discriminator": [
+        46,
+        51,
+        200,
+        59,
+        191,
+        212,
+        25,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "capsule.creator",
+                "account": "Capsule"
+              },
+              {
+                "kind": "account",
+                "path": "capsule.id",
+                "account": "Capsule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "current_owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "new_owner"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "mint_address",
+          "type": {
+            "option": "pubkey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "unlock_capsule",
+      "discriminator": [
+        252,
+        32,
+        190,
+        14,
+        240,
+        239,
+        46,
+        228
+      ],
+      "accounts": [
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "capsule.creator",
+                "account": "Capsule"
+              },
+              {
+                "kind": "account",
+                "path": "capsule.id",
+                "account": "Capsule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_capsule",
+      "discriminator": [
+        81,
+        160,
+        191,
+        32,
+        72,
+        24,
+        187,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "capsule",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  112,
+                  115,
+                  117,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "capsule.creator",
+                "account": "Capsule"
+              },
+              {
+                "kind": "account",
+                "path": "capsule.id",
+                "account": "Capsule"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_content",
+          "type": {
+            "option": "string"
+          }
+        },
+        {
+          "name": "new_unlock_date",
+          "type": {
+            "option": "i64"
+          }
+        },
+        {
+          "name": "new_encrypted_url",
+          "type": {
+            "option": "string"
+          }
+        },
+        {
+          "name": "remove_encrypted_url",
+          "type": "bool"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Capsule",
+      "discriminator": [
+        212,
+        231,
+        77,
+        219,
+        58,
+        13,
+        118,
+        241
+      ]
+    },
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "CapsuleClosed",
+      "discriminator": [
+        83,
+        146,
+        25,
+        18,
+        69,
+        238,
+        40,
+        24
+      ]
+    },
+    {
+      "name": "CapsuleCreated",
+      "discriminator": [
+        113,
+        132,
+        247,
+        198,
+        217,
+        47,
+        201,
+        223
+      ]
+    },
+    {
+      "name": "CapsuleTransferred",
+      "discriminator": [
+        146,
+        238,
+        110,
+        182,
+        145,
+        13,
+        94,
+        50
+      ]
+    },
+    {
+      "name": "CapsuleUnlocked",
+      "discriminator": [
+        225,
+        147,
+        157,
+        140,
+        191,
+        11,
+        31,
+        94
+      ]
+    },
+    {
+      "name": "CapsuleUpdated",
+      "discriminator": [
+        106,
+        169,
+        11,
+        50,
+        21,
+        209,
+        227,
+        13
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "UnlockDateMustBeFuture",
+      "msg": "The unlock date must be in the future"
+    },
+    {
+      "code": 6001,
+      "name": "CapsuleNotReadyToUnlock",
+      "msg": "The capsule is not yet ready to be unlocked"
+    },
+    {
+      "code": 6002,
+      "name": "CapsuleAlreadyUnlocked",
+      "msg": "Cannot update capsule after it has been unlocked"
+    },
+    {
+      "code": 6003,
+      "name": "TitleTooLong",
+      "msg": "Capsule title is too long (max 100 characters)"
+    },
+    {
+      "code": 6004,
+      "name": "ContentTooLong",
+      "msg": "Capsule content is too long (max 300 characters)"
+    },
+    {
+      "code": 6005,
+      "name": "UrlTooLong",
+      "msg": "Encrypted URL is too long (max 500 characters)"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidUnlockDateExtension",
+      "msg": "New unlock date must be later than current unlock date (extend only)"
+    },
+    {
+      "code": 6007,
+      "name": "CannotCloseLockedCapsule",
+      "msg": "Cannot close capsule that hasn't been unlocked"
+    },
+    {
+      "code": 6008,
+      "name": "CapsuleAlreadyHasMint",
+      "msg": "Capsule already has a mint associated with it"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidTokenAccount",
+      "msg": "Invalid token account for this capsule"
+    },
+    {
+      "code": 6010,
+      "name": "UnauthorizedAccess",
+      "msg": "Only the capsule creator can perform this action"
+    },
+    {
+      "code": 6011,
+      "name": "NotOwner",
+      "msg": "Only the capsule owner can perform this action"
+    },
+    {
+      "code": 6012,
+      "name": "CannotTransferToSelf",
+      "msg": "Cannot transfer capsule to the same owner"
+    }
+  ],
+  "types": [
+    {
+      "name": "Capsule",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "unlock_date",
+            "type": "i64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          },
+          {
+            "name": "transferred_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "mint",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "mint_creator",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "is_unlocked",
+            "type": "bool"
+          },
+          {
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "name": "content",
+            "type": "string"
+          },
+          {
+            "name": "encrypted_url",
+            "type": {
+              "option": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CapsuleClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "capsule",
+            "type": "pubkey"
+          },
+          {
+            "name": "closer",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CapsuleCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "capsule",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "name": "unlock_date",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CapsuleTransferred",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "capsule",
+            "type": "pubkey"
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CapsuleUnlocked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "capsule",
+            "type": "pubkey"
+          },
+          {
+            "name": "unlocker",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CapsuleUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "capsule",
+            "type": "pubkey"
+          },
+          {
+            "name": "updater",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_unlock_date",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "content_updated",
+            "type": "bool"
+          },
+          {
+            "name": "url_updated",
+            "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_capsules",
+            "type": "u64"
+          },
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                31
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

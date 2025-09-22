@@ -1,0 +1,10 @@
+{
+  "treeAddress": "DcwsMGM6gqTPFuVSKQnNjoMCSNyTyy6ML4GdTEqCfkr7",
+  "signature": "206,35,17,163,63,158,240,140,33,56,23,244,36,136,26,103,27,125,34,115,252,29,245,23,195,26,199,71,119,81,139,40,191,67,98,218,179,40,59,84,162,140,131,149,19,181,191,208,154,153,225,120,81,55,76,38,230,94,209,66,84,187,21,5",
+  "maxDepth": 14,
+  "maxBufferSize": 64,
+  "canopyDepth": 0,
+  "capacity": 16384,
+  "createdAt": "2025-08-27T00:28:02.050Z",
+  "rpcEndpoint": "https://api.devnet.solana.com"
+}
